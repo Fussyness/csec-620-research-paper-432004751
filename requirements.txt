@@ -1,11 +1,15 @@
-# Minimal dependencies. Install into a plain virtual environment:
+# Install into a plain virtual environment:
 #   python3 -m venv .venv && source .venv/bin/activate
 #   pip install -r requirements.txt
+# For GPU training install a CUDA build of torch/torchvision first, e.g.
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
 numpy
 pandas
+scipy
 scikit-learn
 matplotlib
+pillow
 pyyaml
 torch
-keras           # Keras 3 — run it on the existing PyTorch backend (KERAS_BACKEND=torch)
+torchvision
 pytest

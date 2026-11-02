@@ -15,4 +15,4 @@ jobs:
       - name: Smoke tests
         run: python -m pytest -q
       - name: Reproduce (sanity run)
-        run: python -m src.train --config config.yaml
+        run: python -m src.train --config config.ci.yaml

@@ -1,19 +1,64 @@
 # Data
 
-**Do not commit datasets to Git.** They are large, may be license-restricted, and bloat history.
+**Do not commit datasets to Git.** Everything in `data/` except this file is git-ignored.
 
-Instead:
+Two datasets are needed. Download them by hand (both need an account or a manual
+click-through), then fill in the *Recorded* lines below. The paper reports these values,
+because the published Malimg sample counts differ between papers (9,458 in [1], 9,339 in [14]).
 
-1. Document exactly where the data comes from (name, version, URL, date accessed).
-2. Provide a script or one-liner to download it into this folder.
-3. Reference the file(s) via `config.yaml` (`data.source: csv`, `data.csv_path: data/your_file.csv`).
+## Malimg (E1, E2, E4)
 
-## This project's dataset
+- **What:** pre-rendered grayscale byteplots, 25 families, from Nataraj et al. [1].
+- **Get it:** the original UCSB download link in [1] no longer works, so use a mirror
+  (this project used a Kaggle copy). Unzip so the layout is:
 
-- **Name / source:** _e.g., CIC-IoT2023 — https://www.unb.ca/cic/datasets/iotdataset-2023.html_
-- **Download:** _command or steps_
-- **Target column:** _e.g., `label`_
-- **Notes:** _class balance, preprocessing, known label issues_
+  ```
+  data/malimg_paper_dataset_imgs/<Family>/<sample>.png    # 25 family folders
+  ```
 
-The template ships with a **synthetic** dataset (`data.source: synthetic`) so `make reproduce`
-runs before you wire up real data.
+  If your copy unpacks under another name, set `data.malimg_dir` in `config.yaml`.
+- **Check it:**
+
+  ```bash
+  find data/malimg_paper_dataset_imgs -name '*.png' | wc -l            # sample count
+  ls data/malimg_paper_dataset_imgs | wc -l                             # 25 families
+  sha256sum malimg_dataset.zip                                          # the archive you downloaded
+  ```
+
+- **Recorded:** mirror URL + version: https://www.kaggle.com/datasets/ikrambenabd/malimg-original/data V1 · date: 11-2-2016 · PNG count: **9,339** (25 families;
+  [1] reports 9,458) · archive SHA-256: 0457c29a1b7927046683956f587d088936f8bf7674e88ef3e631eadb6c258494
+
+## Microsoft BIG 2015 (E3)
+
+- **What:** Microsoft Malware Classification Challenge (Kaggle, 2015): ~10.9k labelled
+  training samples, 9 families, as hex `.bytes` dumps (PE headers removed) plus `.asm` files.
+- **Get it:** Kaggle competition "malware-classification" → `train.7z` and `trainLabels.csv`.
+  Only the `.bytes` files are used; skip extracting `.asm` to save disk space:
+
+  ```bash
+  # extract only the ids in the committed subset list (or all .bytes if you have the disk)
+  7z x train.7z -odata/extracted @data/big2015_subset.txt
+  cp trainLabels.csv data/extracted/
+  ```
+
+  Layout: `data/extracted/train/<Id>.bytes` and `data/extracted/trainLabels.csv`.
+- **Subset:** disk space ruled out the full set (`train.7z` is ~18.8 GB; all `.bytes` far
+  more). `data/big2015_subset.txt` (committed) lists the 2,042 ids used: up to 250 per
+  family, all 42 Simda. The loader reads it (`data.big2015_ids`), so the exact subset is
+  recreated even from a full extraction.
+- **Rendering:** the first run converts each `.bytes` file to a byteplot with [1]'s width
+  table and caches it as `data/cache/big2015_png/<Id>.png`. This is slow once and fast after.
+- **Unknown bytes:** `??` entries are dropped, not mapped to 0 (`parse_bytes_file`).
+- **Recorded:** date: 11-2-2016 · `trainLabels.csv` rows: **10,868** · used: **2,042** ·
+  subset rule / seed: selected as a stratified subset, 250 per-family was used due to storage space limitations · SHA-256 of `train.7z`: 103ebbb07a4865537c87c116f480989742f1e5fc4ca663183a3f46494eeeeb38
+
+## Cache
+
+`data/cache/` holds per-dataset descriptor arrays (GIST, histograms, resized CNN
+inputs, pixel hashes). They are keyed by the descriptor settings, so changing GIST
+parameters creates new cache files. Delete the folder to force recomputation.
+
+## Synthetic
+
+`data.source: synthetic` (used by `config.ci.yaml` and the tests) generates small fake
+byteplots with injected duplicates in memory. It needs no download and is not a result.

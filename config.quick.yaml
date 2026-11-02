@@ -1,0 +1,6 @@
+# Quick run for graders short on time: 1 seed, 5 folds.
+# State in the paper which config produced each reported number.
+inherit: config.yaml
+seeds: [0]
+splits: {n_folds: 5}
+output: {dir: results_quick}

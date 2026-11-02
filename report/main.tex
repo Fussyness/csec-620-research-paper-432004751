@@ -1,0 +1,228 @@
+% CSEC 620 Graduate Research Paper — Track B (reproduction / extension)
+% Build on Overleaf (IEEEtran is built in) or locally: latexmk -pdf main.tex
+% Tables/figures under generated/ and figures/ come from `make reproduce`
+% (src/tables.py). Do not type result numbers by hand: use the tables or the
+% macros in generated/numbers.tex (e.g. \EOneGistKnnAcc).
+%
+% Page budget (Milestone 2): 9 pages incl. ~1 page of references; cap is 10.
+\documentclass[conference]{IEEEtran}
+\usepackage{cite}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{url}
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+\newcommand{\inputgen}[1]{\IfFileExists{generated/#1}{\input{generated/#1}}{\todo{run make reproduce to generate #1}}}
+\newcommand{\figgen}[2]{\IfFileExists{figures/#1}{\includegraphics[width=#2]{figures/#1}}{\todo{missing figures/#1}}}
+\IfFileExists{generated/numbers.tex}{\input{generated/numbers.tex}}{}
+
+\begin{document}
+
+\title{\todo{Title}}
+\author{\IEEEauthorblockN{\todo{Name}}
+\IEEEauthorblockA{Department of Cybersecurity, Rochester Institute of Technology\\
+Rochester, NY, USA\\ \todo{email}}}
+\maketitle
+
+% ~0.2 pages: problem; what was reproduced; the three extension findings WITH
+% numbers (from generated/numbers.tex); one-line takeaway.
+\begin{abstract}
+\todo{Abstract}
+\end{abstract}
+
+\begin{IEEEkeywords}
+malware classification, byteplot, GIST, reproducibility, data leakage, adversarial robustness
+\end{IEEEkeywords}
+
+% ---------------------------------------------------------------- I (0.8 p)
+\section{Introduction}
+% - Why static, execution-free classification matters.
+% - The headline-accuracy puzzle: 98--99% everywhere [1], [4], [7], [8].
+% - RQ1--RQ4 (below), contributions list, how this differs from [14].
+\todo{Introduction}
+
+\begin{itemize}
+  \item \textbf{RQ1 (Reproduction):} Does GIST + $k$-NN reach roughly 98\% on Malimg under the protocol of~\cite{nataraj2011images}, and how close does a fine-tuned CNN come to~\cite{kalash2018mcnn,vasan2020imcfn} under the same split?
+  \item \textbf{RQ2 (Leakage):} How much accuracy survives when exact and near-duplicate images are kept on one side of the split?
+  \item \textbf{RQ3 (Generalization):} Do the method rankings hold on Microsoft BIG~2015 under an identical pipeline?
+  \item \textbf{RQ4 (Robustness):} How quickly do GIST + $k$-NN and the CNN degrade under functionality-preserving byte appending?
+\end{itemize}
+
+% ---------------------------------------------------------------- II (0.6 p)
+\section{Background}
+% Byteplot construction + width table [1]; GIST [3]; CNN transfer learning [9];
+% PE format basics needed for the threat model [12].
+\todo{Background}
+
+% ---------------------------------------------------------------- III (1.3 p)
+\section{Related Work}
+% Organise by pipeline stage following [17], NOT paper-by-paper:
+% (a) image construction [1], [6]; (b) features/classifiers [4], [5], [7], [8], [10];
+% (c) evaluation practice [15], [16]; (d) robustness [11]--[14].
+\todo{Related work}
+
+% Fair-comparison table (assignment requirement). Fill each cell from the paper
+% itself. A row that differs from ours in ANY column is "indicative only".
+% - Sample counts: give each published number's own dataset count (Malimg is
+%   9,458 in [1] but 9,339 in our copy and in [14]).
+% - Every BIG 2015 row is indicative only: our 2,042-sample capped subset is
+%   more balanced than the full 10,868-sample training set used in [4], [5].
+\begin{table*}[t]
+\centering
+\caption{Published results and whether each is comparable to ours. ``Indicative'' = differs from our setup in at least one column.}
+\label{tab:published}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllllllll}
+\toprule
+Work & Dataset & Method & Samples & Split protocol & Preprocessing / size & Metric & Reported & Comparable? \\
+\midrule
+\cite{nataraj2011images} & Malimg & GIST + $k$-NN & 9,458 & \todo{} & \todo{} & Acc. & $\approx$98\% & Indicative (count) \\
+\cite{kalash2018mcnn} & Malimg & VGG16 (M-CNN) & \todo{} & \todo{} & \todo{} & Acc. & 98.52\% & \todo{} \\
+\cite{gibert2019cnn} & Malimg & CNN & \todo{} & \todo{} & \todo{resizing method} & \todo{} & \todo{} & \todo{} \\
+\cite{vasan2020imcfn} & Malimg & Fine-tuned CNN, color & \todo{} & \todo{} & \todo{augmentation} & Acc. & 98.82\% & \todo{} \\
+\cite{tariq2026framework} & Malimg & \todo{} & 9,339 & \todo{} & oversampling & \todo{} & \todo{} & \todo{} \\
+\midrule
+\cite{kalash2018mcnn} & BIG 2015 & VGG16 (M-CNN) & \todo{} & \todo{} & \todo{} & Acc. & 99.97\% & Indicative (subset) \\
+\cite{gibert2019cnn} & BIG 2015 & CNN & \todo{} & \todo{} & \todo{} & \todo{} & \todo{} & Indicative (subset) \\
+\midrule
+This work (E1) & Malimg & see Table~\ref{tab:main} & 9,339 & stratified 10-fold & \todo{} & Acc., macro-F1 & Table~\ref{tab:main} & -- \\
+This work (E3) & BIG 2015 & see Table~\ref{tab:main} & 2,042 & grouped 10-fold & width table [1] & Acc., macro-F1 & Table~\ref{tab:main} & -- \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+% ---------------------------------------------------------------- IV (1.6 p)
+\section{Methodology}
+% Datasets and counts (report the Malimg version, count and SHA-256 you used);
+% dedup procedure (pixel SHA-256 + near-duplicate threshold and how it was tuned);
+% split protocols; GIST + k-NN details incl. every assumption [1], [3];
+% CNN training [9]; threat model and attacks [11], [12]; metrics; make reproduce.
+\subsection{Datasets}
+% MUST INCLUDE (write in your own words):
+% Malimg [1]
+%  - Source: the exact mirror used (Kaggle page + version); the original UCSB
+%    download link no longer works.
+%  - Size: 9,339 images, 25 families. Differs from the 9,458 reported in [1];
+%    recent work [14] also uses 9,339.
+%  - Format: ships as pre-rendered grayscale PNGs, so the width table was NOT
+%    applied by us for this dataset.
+% Microsoft BIG 2015 \cite{ronen2018big2015}
+%  - Source: the Kaggle competition; cite Ronen et al.
+%  - Used: only the labelled training set (test labels were never released),
+%    and only the .bytes hex dumps, not .asm. PE headers were removed by the
+%    dataset's creators.
+%  - "??" entries: DROPPED (removed before rendering, not mapped to 0); see
+%    src/data.py: parse_bytes_file. Say this changes byte offsets slightly.
+%  - Rendering: .bytes -> byteplot with [1]'s width table; last partial row
+%    zero-padded (assumption); src/data.py: byteplot.
+%  - Subset: up to 250 per family, all 42 Simda kept -> 2,042 samples.
+%    State the rule: \todo{fixed seed N / method}. The id list is committed as
+%    data/big2015_subset.txt and read by the loader (config data.big2015_ids),
+%    so the exact subset can be recreated.
+\begin{table}[t]
+\centering
+\caption{Datasets as used in this work.}
+\label{tab:datasets}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lll}
+\toprule
+ & Malimg \cite{nataraj2011images} & BIG 2015 \cite{ronen2018big2015} \\
+\midrule
+Source & \todo{Kaggle mirror, version} & Kaggle competition (train set) \\
+Samples used & 9,339 (9,458 in \cite{nataraj2011images}) & 2,042 of 10,868 \\
+Families & 25 & 9 \\
+Input format & pre-rendered grayscale PNG & \texttt{.bytes} hex dumps (no PE headers) \\
+Rendering & none (as shipped) & width table of \cite{nataraj2011images}; \texttt{??} dropped \\
+Sampling & all & $\le$250 per family; all 42 Simda \\
+Used in & E1, E2, E4 & E3 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+\todo{Datasets prose}
+\subsection{Deduplication and Splits}
+\todo{}
+\subsection{Models}
+\todo{}
+\subsection{Threat Model and Attacks}
+\todo{}
+\subsection{Metrics and Statistics}
+\todo{}
+
+% ---------------------------------------------------------------- V (2.0 p)
+\section{Results}
+\begin{table}[t]
+\centering
+\caption{Mean $\pm$ std over seeds (out-of-fold, pooled per seed).}
+\label{tab:main}
+\resizebox{\columnwidth}{!}{\inputgen{table_main.tex}}
+\end{table}
+
+\subsection{RQ1: Reproduction}
+\todo{}
+\subsection{RQ2: Duplicates and Leakage}
+\begin{table}[t]
+\centering
+\caption{Per-family duplicate rate and recall, E1 (random) vs.\ E2 (grouped).}
+\label{tab:perfamily}
+\resizebox{\columnwidth}{!}{\inputgen{table_per_family.tex}}
+\end{table}
+\todo{}
+\subsection{RQ3: Cross-Dataset}
+% MUST INCLUDE: BIG 2015 numbers are INDICATIVE ONLY against [4], [5]. Our
+% capped subset (<=250/family) is more balanced than the full training set, so
+% accuracy here is not directly comparable to full-dataset results. Point to
+% the "Comparable?" column of Table~\ref{tab:published}.
+\todo{}
+\subsection{RQ4: Robustness}
+\begin{figure*}[t]
+\centering
+\figgen{e4_budget_curves.png}{\textwidth}
+\caption{Accuracy vs.\ append budget (mean $\pm$ std over seeds).}
+\label{fig:budget}
+\end{figure*}
+\begin{table}[t]
+\centering
+\caption{Robustness AUC (\%), area under accuracy-vs-budget; 100 = no degradation.}
+\label{tab:robust}
+\resizebox{\columnwidth}{!}{\inputgen{table_robustness.tex}}
+\end{table}
+\todo{}
+
+% ---------------------------------------------------------------- VI (0.9 p)
+\section{Discussion}
+% Is Malimg still a useful benchmark? Why GIST and CNN converge on easy data;
+% robustness gap and deployment; [16]'s pitfalls applied to the literature [15], [16].
+\todo{Discussion}
+
+% ---------------------------------------------------------------- VII (0.4 p)
+\section{Limitations and Threats to Validity}
+% No timestamps (no temporal split) [15]; Malimg ships images not binaries, so
+% functionality of perturbed files cannot be verified; small family count; compute.
+% MUST INCLUDE:
+%  - Unverified mirror: we cannot confirm the Malimg mirror is identical to the
+%    authors' original data (count already differs: 9,339 vs 9,458).
+%  - Storage limits: disk space, not a methodological choice, is why a BIG 2015
+%    subset (2,042 of 10,868) was used instead of the full set.
+%  - IF E3 IS DROPPED: say so here, and move cross-dataset testing to Future Work.
+\todo{Limitations}
+
+% ---------------------------------------------------------------- VIII (0.3 p)
+\section{Conclusion and Future Work}
+% Answers to RQ1--RQ4; stronger attacks [13], [14]; time-aware datasets.
+% IF E3 IS DROPPED: cross-dataset testing on BIG 2015 becomes future work.
+\todo{Conclusion}
+
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+
+\appendices
+\section{Code and Reproducibility}
+% Repo URL + tag; `make reproduce` (config.yaml) vs `make quick`; which produced the numbers.
+\todo{}
+\section{AI Use and Statement of Original Work}
+% Required by the assignment. Log every substantive AI use (see SUBMISSION.md).
+\todo{}
+
+\end{document}

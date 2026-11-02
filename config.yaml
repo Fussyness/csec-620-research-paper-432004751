@@ -1,23 +1,69 @@
-# Experiment configuration — edit this, not the code, to change a run.
-seed: 42
+# Full run: produces every number in the paper. `make reproduce` uses this file.
+# Needs Malimg (and BIG 2015 for e3) in data/ — see data/README.md.
+#   config.quick.yaml  1 seed, fewer folds, BIG 2015 subset (inherits from this file)
+#   config.ci.yaml     synthetic data, tiny CNN; used by CI and the smoke tests
+#
+# Values marked [1]? are my reading of Nataraj et al. (2011) — verify each one
+# against the paper and list anything it does not state as an assumption.
+
+seeds: [0, 1, 2, 3, 4]
+
+run:
+  experiments: [e1, e2, e3, e4]
+  models: [gist_knn, cnn, byte_hist_lr]
+  # metrics.json headline = first entry that produced results
+  headline: [e1/gist_knn, e1/cnn, e1/byte_hist_lr]
+
+experiments:
+  e1: {dataset: malimg, split: stratified}   # RQ1: [1]'s protocol
+  e2: {dataset: malimg, split: grouped}      # RQ2: duplicates kept inside one fold
+  e3: {dataset: big2015, split: grouped}     # RQ3: same pipeline, other dataset
+  e4: {attack_on: e2}                        # RQ4: attacks on E2's test folds and models
 
 data:
-  source: synthetic        # "synthetic" (default) or "csv"
-  csv_path: data/dataset.csv
-  target: label            # target column name when source == csv
-  n_samples: 2000          # synthetic only
-  n_features: 20           # synthetic only
-  test_size: 0.2
+  source: real             # real | synthetic (synthetic replaces every dataset; CI only)
+  malimg_dir: data/malimg_paper_dataset_imgs
+  big2015_dir: data/extracted     # train/<Id>.bytes + trainLabels.csv; only extracted ids are used
+  big2015_ids: data/big2015_subset.txt  # committed list of the 2,042 sample ids used (null = all extracted)
+  big2015_subset: null     # int → further stratified subset (applied after big2015_ids)
+  cache_dir: data/cache
+  # [1]? Table 1, file size in KB → byteplot width; [upper bound (exclusive), width]
+  width_table: [[10, 32], [30, 64], [60, 128], [100, 256], [200, 384],
+                [500, 512], [1000, 768], [null, 1024]]
+  synthetic: {n_families: 5, per_family: 30, dup_rate: 0.2, min_kb: 2, max_kb: 40}
 
-model:
-  hidden_sizes: [64, 32]
-  dropout: 0.1
+splits:
+  n_folds: 10              # [1]? 10-fold cross-validation
 
-train:
-  epochs: 30
-  batch_size: 64
-  lr: 0.001
-  weight_decay: 0.0001
+dedup:
+  feature: gist            # gist | thumbnail — descriptor for near-duplicate distance
+  # null = exact duplicates only. Tune on a held-out sample using
+  # results/e2/nn_distance_hist.png and info.nn_distance_quantiles in e2/summary.json.
+  near_threshold: null
+
+features:
+  gist: {image_size: 64, orientations: [8, 8, 4], blocks: 4}   # [1]? → 320-D
+  thumbnail_size: 32
+
+models:
+  gist_knn: {k: 3}         # [1]? k = 3, Euclidean
+  byte_hist_lr: {C: 1.0, max_iter: 3000}
+  cnn:
+    backbone: resnet50     # torchvision name; resnet18 is a cheaper fallback
+    pretrained: true       # ImageNet weights (downloaded once by torchvision)
+    freeze_backbone: false # true = train the head only (no-GPU fallback)
+    input_size: 224
+    epochs: 5
+    batch_size: 64
+    lr: 0.0001
+    weight_decay: 0.0001
+    class_weighted: true
+    max_folds: null        # run only the first N folds of each seed (null = all)
+
+attack:
+  budgets: [0, 0.01, 0.02, 0.05, 0.10]
+  types: [random, zero, other_family, fgsm]
+  fgsm_eps: 1.0            # step in [0,1] pixel units; appended bytes are attacker-controlled
 
 output:
   dir: results

@@ -1,0 +1,11 @@
+# CI / smoke-test run: synthetic byteplots, tiny untrained CNN, no downloads.
+inherit: config.yaml
+seeds: [0]
+run: {experiments: [e1, e2, e4]}
+data: {source: synthetic}
+splits: {n_folds: 3}
+dedup: {feature: thumbnail, near_threshold: 0.5}
+models:
+  cnn: {backbone: resnet18, pretrained: false, input_size: 64, epochs: 2, batch_size: 32}
+attack: {budgets: [0, 0.05, 0.10]}
+output: {dir: results_ci}
