@@ -23,6 +23,9 @@ make ci                    # synthetic sanity run, no data needed -> results_ci/
 make test
 ```
 
+To split the full run across the 10-GPU `lovegood.cs.rit.edu` server, see
+[scripts/lovegood/README.md](scripts/lovegood/README.md).
+
 For a GPU, install a CUDA build of torch first (see `requirements.txt`). The full run
 (5 seeds x 10 folds x 3 models x E1-E4, ResNet-50 on GPU) takes hours. State in the
 paper which config produced the reported numbers.

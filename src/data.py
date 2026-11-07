@@ -147,7 +147,9 @@ def load_big2015(root: str, cache_dir: str, width_table, ids_file: str | None,
         png = png_dir / f"{ids[i]}.png"
         if not png.exists():
             img = byteplot(parse_bytes_file(root / "train" / f"{ids[i]}.bytes"), width_table)
-            Image.fromarray(img).save(png)
+            tmp = png.with_suffix(f".{os.getpid()}.tmp.png")
+            Image.fromarray(img).save(tmp)
+            os.replace(tmp, png)              # atomic: parallel jobs never see a partial PNG
             return img
         return _load_png(png)
 

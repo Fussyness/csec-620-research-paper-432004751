@@ -4,12 +4,19 @@ Runs every experiment listed in `run.experiments` for every seed and fold and
 writes, under `output.dir`:
 
   splits/<exp>_seed<s>.csv     fold (and duplicate-group) assignment per sample
+  <exp>/runs/seed<s>.json      raw per-seed results (one file per job)
   <exp>/summary.json           mean ± std over seeds for every model
-  <exp>/cm_<model>.png         confusion matrix (seed 0, pooled out-of-fold)
+  <exp>/cm_<model>.png         confusion matrix (first seed, pooled out-of-fold)
   e2/nn_distance_hist.png      near-duplicate threshold tuning aid
   e4/budget_curves.png         accuracy vs. append budget
   metrics.json                 headline numbers + all summaries + anything skipped
 
+Parallel use (e.g. one GPU per job, see scripts/lovegood/):
+  --prepare                    build the descriptor caches once, train nothing
+  --experiments e2 --seeds 0   run one slice; writes only its runs/seed0.json
+  --merge                      combine all runs/seed*.json into the summaries
+
+Without --experiments/--seeds the run does everything and merges at the end.
 Parts that are not implemented yet (GIST, the attacks) are skipped and listed
 under "skipped" in metrics.json instead of failing the run.
 """
@@ -53,10 +60,27 @@ def set_seed(seed: int):
     torch.manual_seed(seed); torch.cuda.manual_seed_all(seed)
 
 
+def _write_json(path, obj):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(obj, f, indent=2)
+
+
+def _dedupe(skipped):
+    return [dict(t) for t in dict.fromkeys(tuple(s.items()) for s in skipped)]
+
+
 # ---------------------------------------------------------------- representations
 def _cache_path(cfg, ds, key):
     ident = hashlib.sha1(("|".join(ds.names) + key).encode()).hexdigest()[:12]
     return os.path.join(cfg["data"]["cache_dir"], f"{ds.name}_{ident}.npy")
+
+
+def _save_atomic(path, arr):
+    """Write then rename, so a parallel job never reads a half-written cache file."""
+    tmp = f"{path}.{os.getpid()}.tmp.npy"
+    np.save(tmp, arr)
+    os.replace(tmp, path)
 
 
 def compute_representations(ds, reps_needed: dict, cfg, skipped: list):
@@ -93,11 +117,11 @@ def compute_representations(ds, reps_needed: dict, cfg, skipped: list):
         hashes = new_hashes
         if use_cache:
             os.makedirs(cfg["data"]["cache_dir"], exist_ok=True)
-            np.save(hash_path, np.array(hashes))
+            _save_atomic(hash_path, np.array(hashes))
         for name, (path, _, vals) in todo.items():
             reps[name] = np.stack(vals)
             if use_cache:
-                np.save(path, reps[name])
+                _save_atomic(path, reps[name])
     return reps, hashes
 
 
@@ -115,6 +139,7 @@ def attack_fold(model, ds, te, tr, clean_pred, cfg, seed, fold_k):
     the clean predictions. Returns {attack: {budget: preds}}."""
     a = cfg["attack"]
     rng = np.random.default_rng(seed * 7919 + fold_k)
+    imgs = [ds.load(i) for i in te]          # load once, reuse for every attack and budget
     out = {}
     for kind in a["types"]:
         if kind == "fgsm" and model.name != "cnn":
@@ -125,8 +150,8 @@ def attack_fold(model, ds, te, tr, clean_pred, cfg, seed, fold_k):
                 out[kind][b] = clean_pred
                 continue
             reps = []
-            for i in te:
-                img, label = ds.load(i), int(ds.labels[i])
+            for i, img in zip(te, imgs):
+                label = int(ds.labels[i])
 
                 def donors():             # a training sample from another family
                     pool = tr[ds.labels[tr] != label]
@@ -138,7 +163,10 @@ def attack_fold(model, ds, te, tr, clean_pred, cfg, seed, fold_k):
 
 
 # ---------------------------------------------------------------- one experiment
-def run_experiment(exp, spec, cfg, out, skipped, attack_exp=None):
+def prepare_experiment(exp, spec, cfg, out, skipped):
+    """Load the dataset, compute (or load cached) representations, and build the
+    duplicate groups. Returns (ds, models, reps, groups, info), or None if a
+    required descriptor is unavailable."""
     print(f"\n=== {exp}: dataset={spec['dataset']} split={spec['split']}")
     ds = load_dataset(spec["dataset"], cfg)
     y, n_classes = ds.labels, len(ds.families)
@@ -161,7 +189,7 @@ def run_experiment(exp, spec, cfg, out, skipped, attack_exp=None):
             "families": ds.families, "split": spec["split"],
             "family_counts": np.bincount(y, minlength=n_classes).tolist(),
             "n_exact_duplicate_groups": int(len(set(hashes))),
-            "n_folds": cfg["splits"]["n_folds"], "seeds": cfg["seeds"]}
+            "n_folds": cfg["splits"]["n_folds"]}
 
     groups = None
     if grouped:
@@ -175,130 +203,197 @@ def run_experiment(exp, spec, cfg, out, skipped, attack_exp=None):
         elif dd["near_threshold"]:
             skipped.append({"what": exp, "reason": f"near-duplicate grouping needs the "
                             f"'{dd['feature']}' descriptor, which is unavailable"})
-            return None, None
+            return None
         groups = duplicate_groups(hashes, dfeat, dd["near_threshold"])
         info.update(near_threshold=dd["near_threshold"], dedup_feature=dd["feature"],
                     n_groups=int(groups.max() + 1),
                     duplicate_rate_by_family=duplicate_rate_by_family(groups, y, ds.families))
+    return ds, models, reps, groups, info
 
+
+def run_seed(exp, seed, prepared, cfg, out, skipped, attack_exp):
+    """Train and evaluate every model on every fold of one seed; write
+    <exp>/runs/seed<seed>.json."""
+    ds, models, reps, groups, info = prepared
+    y, n_classes = ds.labels, len(ds.families)
+    t_seed = time.time()
+    set_seed(seed)
+    fold = make_folds(y, cfg["splits"]["n_folds"], seed, groups)
+    save_folds(os.path.join(out, "splits", f"{exp}_seed{seed}.csv"), ds, fold, groups)
     do_attack = attack_exp is not None
-    per_seed = {m.name: [] for m in models}
-    adv = {m.name: [] for m in models}     # per seed: {attack: {budget: (acc, evasion)}}
-    tests = []
-    for seed in cfg["seeds"]:
-        set_seed(seed)
-        fold = make_folds(y, cfg["splits"]["n_folds"], seed, groups)
-        save_folds(os.path.join(out, "splits", f"{exp}_seed{seed}.csv"), ds, fold, groups)
-        preds = {}
-        for m in models:
-            max_folds = cfg["models"].get(m.name, {}).get("max_folds") or cfg["splits"]["n_folds"]
-            prob = np.zeros((len(y), n_classes), dtype=np.float32)
-            evaluated = np.zeros(len(y), dtype=bool)
-            adv_pred = {}
-            t0 = time.time()
-            for k in range(max_folds):
-                tr, te = np.where(fold != k)[0], np.where(fold == k)[0]
-                m.fit(reps[m.name][tr], y[tr], n_classes, seed * 1000 + k)
-                prob[te] = m.predict_proba(reps[m.name][te])
-                evaluated[te] = True
-                if do_attack:
-                    try:
-                        fold_adv = attack_fold(m, ds, te, tr, prob[te].argmax(1), cfg, seed, k)
-                    except NotImplementedError as e:
-                        skipped.append({"what": attack_exp, "reason": str(e)})
-                        do_attack = False
-                        continue
-                    for kind, by_b in fold_adv.items():
-                        for b, p in by_b.items():
-                            adv_pred.setdefault(kind, {}).setdefault(b, np.full(len(y), -1))[te] = p
-            ev = np.where(evaluated)[0]
-            met = compute_metrics(y[ev], prob[ev])
-            met["fit_predict_seconds"] = time.time() - t0
-            met["n_evaluated"] = int(len(ev))
-            per_seed[m.name].append(met)
-            preds[m.name] = (ev, prob.argmax(1))
-            print(f"  seed {seed} {m.name}: acc={met['accuracy']:.4f} "
-                  f"macroF1={met['f1']:.4f} ({met['fit_predict_seconds']:.0f}s)")
-            if seed == cfg["seeds"][0]:
-                save_confusion_matrix(y[ev], prob[ev].argmax(1), ds.families,
-                                      os.path.join(exp_dir, f"cm_{m.name}.png"), f"{exp} {m.name}")
+    record = {"exp": exp, "seed": seed, "info": info, "models": {}, "attack": {},
+              "mcnemar": [], "skipped": []}
+    preds = {}
+    for m in models:
+        max_folds = cfg["models"].get(m.name, {}).get("max_folds") or cfg["splits"]["n_folds"]
+        prob = np.zeros((len(y), n_classes), dtype=np.float32)
+        evaluated = np.zeros(len(y), dtype=bool)
+        adv_pred = {}
+        t0 = time.time()
+        for k in range(max_folds):
+            tr, te = np.where(fold != k)[0], np.where(fold == k)[0]
+            m.fit(reps[m.name][tr], y[tr], n_classes, seed * 1000 + k)
+            prob[te] = m.predict_proba(reps[m.name][te])
+            evaluated[te] = True
             if do_attack:
-                clean = prob.argmax(1)[ev]
-                adv[m.name].append({kind: {b: (float((p[ev] == y[ev]).mean()),
-                                               evasion_rate(y[ev], clean, p[ev]))
-                                           for b, p in by_b.items()}
-                                    for kind, by_b in adv_pred.items()})
-        for a, b in combinations(preds, 2):
-            common = np.intersect1d(preds[a][0], preds[b][0])
-            tests.append({"seed": seed, "a": a, "b": b,
-                          **mcnemar(y[common], preds[a][1][common], preds[b][1][common])})
-
-    summary = {"info": info, "models": {}, "mcnemar": tests}
-    for name, runs in per_seed.items():
-        s = {k: mean_std([r[k] for r in runs]) for k in METRICS}
-        s["per_family_recall"] = np.mean([r["per_family_recall"] for r in runs], 0).tolist()
-        s["fit_predict_seconds"] = mean_std([r["fit_predict_seconds"] for r in runs])
-        s["per_seed"] = [{k: r[k] for k in METRICS} for r in runs]
-        summary["models"][name] = s
-    with open(os.path.join(exp_dir, "summary.json"), "w") as f:
-        json.dump(summary, f, indent=2)
-
-    attack_summary = None
-    if do_attack and any(adv.values()):
-        budgets = cfg["attack"]["budgets"]
-        attack_summary = {"budgets": budgets, "models": {}}
-        for name, seeds in adv.items():
-            attack_summary["models"][name] = {
-                kind: {"accuracy": [mean_std([s[kind][b][0] for s in seeds]) for b in budgets],
-                       "evasion_rate": [mean_std([s[kind][b][1] for s in seeds]) for b in budgets],
-                       "robustness_auc": mean_std([robustness_auc(budgets, [s[kind][b][0] for b in budgets])
-                                                   for s in seeds])}
-                for kind in seeds[0]} if seeds else {}
-        adir = os.path.join(out, attack_exp); os.makedirs(adir, exist_ok=True)
-        with open(os.path.join(adir, "summary.json"), "w") as f:
-            json.dump(attack_summary, f, indent=2)
-        save_budget_curves(attack_summary["models"], budgets, os.path.join(adir, "budget_curves.png"))
-    return summary, attack_summary
+                try:
+                    fold_adv = attack_fold(m, ds, te, tr, prob[te].argmax(1), cfg, seed, k)
+                except NotImplementedError as e:
+                    skipped.append({"what": attack_exp, "reason": str(e)})
+                    do_attack = False
+                    continue
+                for kind, by_b in fold_adv.items():
+                    for b, p in by_b.items():
+                        adv_pred.setdefault(kind, {}).setdefault(b, np.full(len(y), -1))[te] = p
+        ev = np.where(evaluated)[0]
+        met = compute_metrics(y[ev], prob[ev])
+        met["fit_predict_seconds"] = time.time() - t0
+        met["n_evaluated"] = int(len(ev))
+        record["models"][m.name] = met
+        preds[m.name] = (ev, prob.argmax(1))
+        print(f"  {exp} seed {seed} {m.name}: acc={met['accuracy']:.4f} "
+              f"macroF1={met['f1']:.4f} ({met['fit_predict_seconds']:.0f}s)")
+        if seed == cfg["seeds"][0]:
+            save_confusion_matrix(y[ev], prob[ev].argmax(1), ds.families,
+                                  os.path.join(out, exp, f"cm_{m.name}.png"), f"{exp} {m.name}")
+        if do_attack:
+            clean = prob.argmax(1)[ev]
+            # per budget, in cfg order: [accuracy, evasion rate]
+            record["attack"][m.name] = {
+                kind: [[float((by_b[b][ev] == y[ev]).mean()), evasion_rate(y[ev], clean, by_b[b][ev])]
+                       for b in cfg["attack"]["budgets"]]
+                for kind, by_b in adv_pred.items()}
+    for a, b in combinations(preds, 2):
+        common = np.intersect1d(preds[a][0], preds[b][0])
+        record["mcnemar"].append({"seed": seed, "a": a, "b": b,
+                                  **mcnemar(y[common], preds[a][1][common], preds[b][1][common])})
+    record["skipped"] = _dedupe(skipped)
+    record["seconds"] = time.time() - t_seed
+    _write_json(os.path.join(out, exp, "runs", f"seed{seed}.json"), record)
 
 
-# ---------------------------------------------------------------- main
-def main(config_path: str):
-    cfg = load_config(config_path)
-    out = cfg["output"]["dir"]; os.makedirs(out, exist_ok=True)
+# ---------------------------------------------------------------- merge
+def _load_runs(out, exp, seeds):
+    runs, missing = [], []
+    for s in seeds:
+        p = os.path.join(out, exp, "runs", f"seed{s}.json")
+        if os.path.exists(p):
+            with open(p) as f:
+                runs.append(json.load(f))
+        else:
+            missing.append(s)
+    return runs, missing
+
+
+def summarize(cfg, out, config_path, extra_skipped=()):
+    """Combine <exp>/runs/seed*.json for the configured seeds into
+    <exp>/summary.json, the attack summary, figures, and metrics.json."""
     specs, wanted = cfg["experiments"], cfg["run"]["experiments"]
     attack_of = {specs[e]["attack_on"]: e for e in wanted if "attack_on" in specs[e]}
-    to_train = [e for e in wanted if "attack_on" not in specs[e]]
-    to_train += [b for b in attack_of if b not in to_train]
+    trained = [e for e in wanted if "attack_on" not in specs[e]]
+    trained += [b for b in attack_of if b not in trained]
+    skipped, summaries, seconds = list(extra_skipped), {}, 0.0
+    budgets = cfg["attack"]["budgets"]
 
-    skipped, summaries = [], {}
-    t0 = time.time()
-    for exp in to_train:
-        s, a = run_experiment(exp, specs[exp], cfg, out, skipped, attack_of.get(exp))
-        if s is not None and exp in wanted:
-            summaries[exp] = s
-        if a is not None:
-            summaries[attack_of[exp]] = a
+    for exp in trained:
+        runs, missing = _load_runs(out, exp, cfg["seeds"])
+        if missing:
+            print(f"WARNING {exp}: no results for seeds {missing}; summarising {len(runs)} seed(s)")
+        if not runs:
+            continue
+        for r in runs:
+            skipped += r["skipped"]
+            seconds += r["seconds"]
+        summary = {"info": {**runs[0]["info"], "seeds": [r["seed"] for r in runs]},
+                   "models": {}, "mcnemar": [t for r in runs for t in r["mcnemar"]]}
+        for name in runs[0]["models"]:
+            per = [r["models"][name] for r in runs]
+            s = {k: mean_std([p[k] for p in per]) for k in METRICS}
+            s["per_family_recall"] = np.mean([p["per_family_recall"] for p in per], 0).tolist()
+            s["fit_predict_seconds"] = mean_std([p["fit_predict_seconds"] for p in per])
+            s["per_seed"] = [{k: p[k] for k in METRICS} for p in per]
+            summary["models"][name] = s
+        _write_json(os.path.join(out, exp, "summary.json"), summary)
+        if exp in wanted:
+            summaries[exp] = summary
+
+        attack_exp = attack_of.get(exp)
+        adv_runs = [r["attack"] for r in runs if r["attack"]]
+        if attack_exp and adv_runs:
+            asum = {"budgets": budgets, "seeds": [r["seed"] for r in runs if r["attack"]],
+                    "models": {}}
+            for name in adv_runs[0]:
+                seeds = [a[name] for a in adv_runs if name in a]
+                asum["models"][name] = {
+                    kind: {"accuracy": [mean_std([s[kind][j][0] for s in seeds]) for j in range(len(budgets))],
+                           "evasion_rate": [mean_std([s[kind][j][1] for s in seeds]) for j in range(len(budgets))],
+                           "robustness_auc": mean_std([robustness_auc(budgets, [v[0] for v in s[kind]])
+                                                       for s in seeds])}
+                    for kind in seeds[0]}
+            _write_json(os.path.join(out, attack_exp, "summary.json"), asum)
+            save_budget_curves(asum["models"], budgets,
+                               os.path.join(out, attack_exp, "budget_curves.png"))
+            summaries[attack_exp] = asum
 
     metrics = {"config": config_path, "seeds": cfg["seeds"],
-               "wall_clock_seconds": round(time.time() - t0, 1)}
+               "compute_seconds": round(seconds, 1)}
     for exp, model in (h.split("/") for h in cfg["run"]["headline"]):
         res = summaries.get(exp, {}).get("models", {}).get(model)
         if res and "accuracy" in res:
             metrics["headline_source"] = f"{exp}/{model} (mean over seeds)"
             metrics.update({k: res[k]["mean"] for k in METRICS})
             break
-    skipped = [dict(t) for t in dict.fromkeys(tuple(s.items()) for s in skipped)]
-    metrics["skipped"] = skipped
+    metrics["skipped"] = _dedupe(skipped)
     metrics["experiments"] = summaries
-    with open(os.path.join(out, "metrics.json"), "w") as f:
-        json.dump(metrics, f, indent=2)
+    _write_json(os.path.join(out, "metrics.json"), metrics)
     print("\nResults written to", out)
     print(json.dumps({k: metrics.get(k) for k in ("headline_source", *METRICS)}, indent=2))
-    for s in skipped:
+    for s in metrics["skipped"]:
         print(f"SKIPPED {s['what']}: {s['reason']}")
+
+
+# ---------------------------------------------------------------- main
+def main(config_path: str, experiments=None, seeds=None, prepare=False, merge=False):
+    cfg = load_config(config_path)
+    out = cfg["output"]["dir"]; os.makedirs(out, exist_ok=True)
+    if merge:
+        summarize(cfg, out, config_path)
+        return
+    specs, wanted = cfg["experiments"], cfg["run"]["experiments"]
+    attack_of = {specs[e]["attack_on"]: e for e in wanted if "attack_on" in specs[e]}
+    to_train = [e for e in wanted if "attack_on" not in specs[e]]
+    to_train += [b for b in attack_of if b not in to_train]
+    if experiments:
+        unknown = set(experiments) - set(to_train)
+        if unknown:
+            raise SystemExit(f"--experiments {sorted(unknown)} are not trained experiments "
+                             f"here (choose from {to_train}; attacks run with their base)")
+        to_train = [e for e in to_train if e in experiments]
+    run_seeds = seeds if seeds is not None else cfg["seeds"]
+
+    skipped = []
+    for exp in to_train:
+        prepared = prepare_experiment(exp, specs[exp], cfg, out, skipped)
+        if prepared is None or prepare:
+            continue
+        for seed in run_seeds:
+            run_seed(exp, seed, prepared, cfg, out, list(skipped), attack_of.get(exp))
+    if prepare:
+        print("\nCaches ready.", *(f"SKIPPED {s['what']}: {s['reason']}" for s in _dedupe(skipped)),
+              sep="\n")
+    elif experiments is None and seeds is None:
+        summarize(cfg, out, config_path, skipped)
+    else:
+        print(f"\nPartial run done ({to_train} x seeds {run_seeds}). "
+              "Run with --merge once every job has finished.")
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.yaml")
-    main(ap.parse_args().config)
+    ap.add_argument("--experiments", nargs="+", help="run only these trained experiments")
+    ap.add_argument("--seeds", nargs="+", type=int, help="run only these seeds")
+    ap.add_argument("--prepare", action="store_true", help="build descriptor caches only")
+    ap.add_argument("--merge", action="store_true", help="summarise existing per-seed runs")
+    a = ap.parse_args()
+    main(a.config, a.experiments, a.seeds, a.prepare, a.merge)
