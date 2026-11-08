@@ -1,8 +1,15 @@
 % CSEC 620 Graduate Research Paper — Track B (reproduction / extension)
 % Build on Overleaf (IEEEtran is built in) or locally: latexmk -pdf main.tex
 % Tables/figures under generated/ and figures/ come from `make reproduce`
-% (src/tables.py). Do not type result numbers by hand: use the tables or the
-% macros in generated/numbers.tex (e.g. \EOneGistKnnAcc).
+% (src/tables.py).
+%
+% HOW TO FILL IN THE GAPS
+%   Every highlighted \fillin{...} box is a value for you to insert. The comment
+%   line(s) starting "% DATA:" directly above it give the exact value and where it
+%   comes from (all mean +- std over 5 seeds unless stated). Where a macro exists
+%   (generated/numbers.tex, rebuilt by `make reproduce`), using it instead of typing
+%   the number guarantees the paper matches results/metrics.json, which the grader
+%   checks. Delete the \fillin and its DATA comment once filled.
 %
 % Page budget (Milestone 2): 9 pages incl. ~1 page of references; cap is 10.
 \documentclass[conference]{IEEEtran}
@@ -14,22 +21,46 @@
 \usepackage{xcolor}
 \usepackage{url}
 \newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+\newcommand{\fillin}[1]{\colorbox{yellow!50}{\textcolor{blue!70!black}{\footnotesize\textsf{#1}}}}
 \newcommand{\inputgen}[1]{\IfFileExists{generated/#1}{\input{generated/#1}}{\todo{run make reproduce to generate #1}}}
 \newcommand{\figgen}[2]{\IfFileExists{figures/#1}{\includegraphics[width=#2]{figures/#1}}{\todo{missing figures/#1}}}
 \IfFileExists{generated/numbers.tex}{\input{generated/numbers.tex}}{}
 
 \begin{document}
 
-\title{\todo{Title}}
-\author{\IEEEauthorblockN{\todo{Name}}
+\title{Malware Images Revisited: Reproducing GIST + $k$-NN Under Duplicate-Aware Splits, a Second Dataset, and Append Attacks}
+\author{\IEEEauthorblockN{Theodore DellaVilla}
 \IEEEauthorblockA{Department of Cybersecurity, Rochester Institute of Technology\\
-Rochester, NY, USA\\ \todo{email}}}
+Rochester, NY, USA\\ \fillin{RIT email}}}
 \maketitle
 
-% ~0.2 pages: problem; what was reproduced; the three extension findings WITH
-% numbers (from generated/numbers.tex); one-line takeaway.
 \begin{abstract}
-\todo{Abstract}
+Visualizing a malware binary as a grayscale ``byteplot'' and classifying its texture
+is a static, execution-free approach whose reported accuracy on the Malimg benchmark
+has sat near 98--99\% since Nataraj et al.\ introduced it in 2011. We reproduce their
+GIST + $k$-NN classifier from scratch and test whether that accuracy survives three
+changes to the evaluation: a split that keeps duplicate and near-duplicate images on
+one side, a second dataset (Microsoft BIG~2015), and functionality-preserving byte
+appending. The reproduction succeeds:
+% DATA: E1 GIST+kNN accuracy 97.46 +- 0.04 %  (macro \EOneGistKnnAcc); [1] reports ~98%
+GIST + $k$-NN reaches \fillin{E1 GIST acc} accuracy on Malimg against $\approx$98\% in the
+original, but its macro-F1 is only
+% DATA: E1 GIST+kNN macro-F1 93.56 +- 0.09 %  (macro \EOneGistKnnFone)
+\fillin{E1 GIST F1}, and a 256-bin byte histogram with logistic regression comes within
+a point of it. We find that 800 Malimg images (one family) are pixel-identical; under a
+duplicate-aware split, GIST + $k$-NN falls to
+% DATA: E2 GIST+kNN accuracy, testable families, 94.95 +- 0.05 %  (macro \ETwoGistKnnAcc)
+\fillin{E2 GIST acc (testable)} on the families that can still be tested, while a
+fine-tuned ResNet-50 holds
+% DATA: E2 CNN accuracy, testable families, 99.03 +- 0.10 %  (macro \ETwoCnnAcc)
+\fillin{E2 CNN acc (testable)}. Appending zero bytes equal to 1\% of a file's size drops
+GIST + $k$-NN from
+% DATA: E4 GIST+kNN zero-append accuracy: budget 0 -> 94.95 %, 1 % -> 73.79 %, 10 % -> 21.23 %
+\fillin{94.95\%} to \fillin{73.79\%} (\fillin{21.23\%} at 10\%), whereas the CNN stays
+above
+% DATA: lowest CNN accuracy at a 5 % budget across all four attacks: 93.85 % (FGSM)
+\fillin{93.8\%} up to a 5\% budget. Malimg accuracy alone therefore says
+little about how well a byteplot classifier generalizes or resists evasion.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -38,10 +69,27 @@ malware classification, byteplot, GIST, reproducibility, data leakage, adversari
 
 % ---------------------------------------------------------------- I (0.8 p)
 \section{Introduction}
-% - Why static, execution-free classification matters.
-% - The headline-accuracy puzzle: 98--99% everywhere [1], [4], [7], [8].
-% - RQ1--RQ4 (below), contributions list, how this differs from [14].
-\todo{Introduction}
+Static malware classification assigns a sample to a family without running it. This
+avoids the cost and risk of dynamic analysis and scales to the volume of samples that
+security vendors receive each day. In 2011, Nataraj et al.~\cite{nataraj2011images}
+proposed a strikingly simple static method: read the binary as a sequence of bytes,
+lay the bytes out as a grayscale image (a \emph{byteplot}), describe the image's
+texture with the GIST descriptor~\cite{oliva2001gist}, and classify it with $k$-nearest
+neighbours. On a new dataset of 25 families, Malimg, they reported about 98\%
+accuracy. Over the following decade, convolutional neural networks (CNNs) pushed the
+same benchmark to 98--99\%~\cite{kalash2018mcnn,gibert2019cnn,vasan2020imcfn,vasan2020imcec}.
+
+Such uniformly high numbers raise a question that the literature rarely asks: are
+they a property of the methods, or of the benchmark and how it is evaluated? Work on
+experimental bias in security machine learning~\cite{pendlebury2019tesseract,arp2022dos}
+shows that sampling choices, duplicated data and unrealistic threat models can
+inflate results substantially. Malimg is an attractive case study because the
+original method is cheap, fully described in the image domain, and still widely used
+as a baseline.
+
+This paper reproduces~\cite{nataraj2011images} from scratch and extends it with a
+duplicate-aware split, a second dataset and an evasion study. It answers four
+research questions:
 
 \begin{itemize}
   \item \textbf{RQ1 (Reproduction):} Does GIST + $k$-NN reach roughly 98\% on Malimg under the protocol of~\cite{nataraj2011images}, and how close does a fine-tuned CNN come to~\cite{kalash2018mcnn,vasan2020imcfn} under the same split?
@@ -50,21 +98,94 @@ malware classification, byteplot, GIST, reproducibility, data leakage, adversari
   \item \textbf{RQ4 (Robustness):} How quickly do GIST + $k$-NN and the CNN degrade under functionality-preserving byte appending?
 \end{itemize}
 
+Our contributions are:
+(i) an independent, from-scratch reproduction of GIST + $k$-NN with every unstated
+parameter listed as an explicit assumption (Table~\ref{tab:assumptions});
+(ii) a duplicate analysis of Malimg showing that one family consists of a single
+image repeated 800 times, and a grouped evaluation that separates leakage from
+untestable families;
+(iii) the same pipeline applied unchanged to BIG~2015;
+(iv) an append-attack study comparing GIST + $k$-NN, a fine-tuned ResNet-50 and a
+byte-histogram baseline under black-box and white-box attacks; and
+(v) a public repository in which one command regenerates every number in this paper.
+Unlike recent adversarial work on Malimg~\cite{tariq2026framework}, which builds a
+stronger detector, we ask how far the original method's reported accuracy can be
+trusted.
+
 % ---------------------------------------------------------------- II (0.6 p)
 \section{Background}
-% Byteplot construction + width table [1]; GIST [3]; CNN transfer learning [9];
-% PE format basics needed for the threat model [12].
-\todo{Background}
+\textbf{Byteplots.} A byteplot reads a file as a vector of 8-bit unsigned integers
+and reshapes it into a two-dimensional grayscale image, one pixel per byte. Nataraj et
+al.\ fix the image width by file size, from 32 pixels for files under 10~KB to 1,024
+pixels above 1,000~KB, and let the height follow from the file length. Sections of a
+Portable Executable (PE) file then appear as visually distinct bands: code is
+fine-grained texture, zero padding is black, and data or resources form their own
+patterns. Variants of one family, which typically share code, produce similar
+textures.
+
+\textbf{GIST.} GIST~\cite{oliva2001gist} summarizes the spatial layout of an image's
+frequency content. The image is resized, normalized, and filtered with a bank of
+Gabor filters at several scales and orientations; the magnitude of each filter's
+response is averaged over a coarse $M \times M$ grid. With $N$ filters, the
+descriptor has $M^2 N$ values. Nataraj et al.\ use $N = 20$ sub-bands and $M = 4$,
+giving 320 features, and classify with $k$-NN under Euclidean distance.
+
+\textbf{CNN transfer learning.} Residual networks~\cite{he2016resnet} pretrained on
+ImageNet can be fine-tuned on a small dataset by replacing the final layer. Applied to
+byteplots, the network learns texture features directly instead of using a
+hand-designed descriptor.
+
+\textbf{Appending to a PE file.} Bytes appended after the last section of a PE file
+(the \emph{overlay}) are not mapped into memory by the loader, so they do not change
+the program's behaviour~\cite{demetrio2021exemples}. Appending is therefore the
+simplest functionality-preserving manipulation available to an attacker, and it
+changes the byteplot: the image grows taller and may move into a wider row of the
+width table.
 
 % ---------------------------------------------------------------- III (1.3 p)
+% VERIFY: each sentence below summarizes a cited paper at the level of its abstract.
+% Check them against the papers (especially [2], [5], [6], [13], [14]) before submitting.
 \section{Related Work}
-% Organise by pipeline stage following [17], NOT paper-by-paper:
-% (a) image construction [1], [6]; (b) features/classifiers [4], [5], [7], [8], [10];
-% (c) evaluation practice [15], [16]; (d) robustness [11]--[14].
-\todo{Related work}
+\textbf{Image construction.} Nataraj et al.~\cite{nataraj2011images} introduced
+byteplots and Malimg. A companion study~\cite{nataraj2011comparative} compared binary
+texture analysis with dynamic analysis and argued that texture features reach
+comparable accuracy at a fraction of the cost. Ni et al.~\cite{ni2018simhash} built
+images from SimHash encodings of opcode sequences rather than raw bytes, and Vasan
+et al.~\cite{vasan2020imcfn} used color instead of grayscale images. A recent
+systematization of knowledge~\cite{brosolo2024sok} organizes visualization-based
+detection by pipeline stage; we follow its structure here.
 
-% Fair-comparison table (assignment requirement). Fill each cell from the paper
-% itself. A row that differs from ours in ANY column is "indicative only".
+\textbf{Features and classifiers.} After GIST, most work replaced hand-designed
+descriptors with CNNs. Kalash et al.~\cite{kalash2018mcnn} fine-tuned a VGG16-based
+network (M-CNN) and reported 98.52\% on Malimg and 99.97\% on BIG~2015.
+Gibert et al.~\cite{gibert2019cnn} trained a CNN from scratch on both datasets.
+Vasan et al.\ fine-tuned CNNs on color byteplots (IMCFN, 98.82\% on
+Malimg)~\cite{vasan2020imcfn} and combined several architectures in an ensemble
+(IMCEC)~\cite{vasan2020imcec}. MalConv~\cite{raff2018malconv} skips the image
+altogether and applies a CNN to the raw byte sequence. Table~\ref{tab:published}
+lists these results with the details that decide whether they are comparable to ours.
+
+\textbf{Evaluation practice.} TESSERACT~\cite{pendlebury2019tesseract} showed that
+spatial and temporal bias in how data are split can inflate malware classifiers'
+reported performance far above what they achieve in deployment. Arp et
+al.~\cite{arp2022dos} catalogued common pitfalls in security machine learning,
+including sampling bias, data snooping, inappropriate baselines and lab-only
+evaluation. Neither study examines Malimg's duplicate structure, which is the focus of
+our RQ2.
+
+\textbf{Robustness.} Kolosnjaji et al.~\cite{kolosnjaji2018adversarial} showed that
+appending a few gradient-chosen bytes evades MalConv, and Demetrio et
+al.~\cite{demetrio2021exemples} surveyed practical functionality-preserving attacks on
+Windows malware detectors, from appending to header and section manipulation.
+AMGmal~\cite{zhan2023amgmal} uses adaptive masks to minimize the perturbation needed
+to evade a detector. Tariq et al.~\cite{tariq2026framework} trained a detector with
+adversarial learning on the same 9,339-image version of Malimg that we use. To our
+knowledge, no prior work measures how the original GIST + $k$-NN pipeline responds to
+append attacks.
+
+% Fair-comparison table (assignment requirement). Fill each \todo cell from the paper
+% itself; these values are not in this repository. A row that differs from ours in ANY
+% column is "indicative only".
 % - Sample counts: give each published number's own dataset count (Malimg is
 %   9,458 in [1] but 9,339 in our copy and in [14]).
 % - Every BIG 2015 row is indicative only: our 2,041-sample capped subset is
@@ -87,42 +208,47 @@ Work & Dataset & Method & Samples & Split protocol & Preprocessing / size & Metr
 \cite{kalash2018mcnn} & BIG 2015 & VGG16 (M-CNN) & \todo{} & \todo{} & \todo{} & Acc. & 99.97\% & Indicative (subset) \\
 \cite{gibert2019cnn} & BIG 2015 & CNN & \todo{} & \todo{} & \todo{} & \todo{} & \todo{} & Indicative (subset) \\
 \midrule
-This work (E1) & Malimg & see Table~\ref{tab:main} & 9,339 & stratified 10-fold & \todo{} & Acc., macro-F1 & Table~\ref{tab:main} & -- \\
-This work (E3) & BIG 2015 & see Table~\ref{tab:main} & 2,041 & grouped 10-fold & width table [1] & Acc., macro-F1 & Table~\ref{tab:main} & -- \\
+This work (E1) & Malimg & see Table~\ref{tab:main} & 9,339 & stratified 10-fold, 5 seeds & as shipped; GIST at $64\times64$, ResNet at $224\times224$ & Acc., macro-F1 & Table~\ref{tab:main} & -- \\
+This work (E3) & BIG 2015 & see Table~\ref{tab:main} & 2,041 & grouped 10-fold, 5 seeds & width table [1] & Acc., macro-F1 & Table~\ref{tab:main} & -- \\
 \bottomrule
 \end{tabular}}
 \end{table*}
 
 % ---------------------------------------------------------------- IV (1.6 p)
 \section{Methodology}
-% Datasets and counts (report the Malimg version, count and SHA-256 you used);
-% dedup procedure (pixel SHA-256 + near-duplicate threshold and how it was tuned);
-% split protocols; GIST + k-NN details incl. every assumption [1], [3];
-% CNN training [9]; threat model and attacks [11], [12]; metrics; make reproduce.
+We run four experiments. E1 reproduces~\cite{nataraj2011images} on Malimg with a
+stratified split; E2 repeats it with a duplicate-aware grouped split; E3 applies the
+E2 protocol to BIG~2015; and E4 attacks the E2 models with appended bytes. Each
+experiment evaluates three models: GIST + $k$-NN (the reproduction), a fine-tuned
+ResNet-50 (a strong CNN baseline) and a byte-histogram logistic regression (a
+deliberately weak baseline that ignores spatial layout).
+
 \subsection{Datasets}
-% MUST INCLUDE (write in your own words):
-% Malimg [1]
-%  - Source: the exact mirror used (Kaggle page + version); the original UCSB
-%    download link no longer works.
-%  - Size: 9,339 images, 25 families. Differs from the 9,458 reported in [1];
-%    recent work [14] also uses 9,339.
-%  - Format: ships as pre-rendered grayscale PNGs, so the width table was NOT
-%    applied by us for this dataset.
-% Microsoft BIG 2015 \cite{ronen2018big2015}
-%  - Source: the Kaggle competition; cite Ronen et al.
-%  - Used: only the labelled training set (test labels were never released),
-%    and only the .bytes hex dumps, not .asm. PE headers were removed by the
-%    dataset's creators.
-%  - "??" entries: DROPPED (removed before rendering, not mapped to 0); see
-%    src/data.py: parse_bytes_file. Say this changes byte offsets slightly.
-%    One subset sample (fRLS3aKkijp4GH0Ds6Pv, Ramnit) is "??" throughout, so it has
-%    no bytes left; it is excluded (config data.big2015_exclude): 2,041 used.
-%  - Rendering: .bytes -> byteplot with [1]'s width table; last partial row
-%    zero-padded (assumption); src/data.py: byteplot.
-%  - Subset: up to 250 per family, all 42 Simda kept -> 2,042 listed, 2,041 used.
-%    State the rule: \todo{fixed seed N / method}. The id list is committed as
-%    data/big2015_subset.txt and read by the loader (config data.big2015_ids),
-%    so the exact subset can be recreated.
+\textbf{Malimg.} The download link given in~\cite{nataraj2011images} no longer works,
+so we used a public mirror:
+% DATA: Malimg mirror = Kaggle dataset "ikrambenabd/malimg-original", version 1
+%   https://www.kaggle.com/datasets/ikrambenabd/malimg-original  (downloaded 2 Nov 2026)
+%   archive SHA-256: 0457c29a1b7927046683956f587d088936f8bf7674e88ef3e631eadb6c258494
+%   (source: data/README.md, "Recorded" line)
+\fillin{mirror name, version, access date}\footnote{\fillin{mirror URL}; archive SHA-256 \fillin{first 16 hex digits}\ldots}.
+It contains 9,339 grayscale PNG images in 25 families, 119 fewer than the 9,458
+reported in~\cite{nataraj2011images}; recent work~\cite{tariq2026framework} uses the
+same 9,339 images. Malimg ships as pre-rendered byteplots, so the width table was not
+applied by us and the original binaries are not available. Family sizes range from 80
+(Skintrim.N) to 2,949 (Allaple.A).
+
+\textbf{BIG~2015.} The Microsoft Malware Classification Challenge~\cite{ronen2018big2015}
+released hexadecimal dumps (\texttt{.bytes}) and disassembly (\texttt{.asm}) of 10,868
+labelled training samples in nine families; test labels were never released. The
+dataset's creators removed the PE headers. We use only the labelled training set and
+only the \texttt{.bytes} files, which we render with the width table
+of~\cite{nataraj2011images}. Bytes the dump marks as unknown (\texttt{??}) are dropped
+rather than mapped to zero, which shifts later byte offsets slightly. Storage limits
+ruled out extracting the full set, so we drew a random subset of at most 250 samples
+per family with seed 620, keeping all 42 Simda samples (2,042 samples; the list is
+committed to the repository). One Ramnit sample consists only of \texttt{??} bytes and
+is excluded, leaving 2,041. Table~\ref{tab:datasets} summarizes both datasets.
+
 \begin{table}[t]
 \centering
 \caption{Datasets as used in this work.}
@@ -132,26 +258,110 @@ This work (E3) & BIG 2015 & see Table~\ref{tab:main} & 2,041 & grouped 10-fold &
 \toprule
  & Malimg \cite{nataraj2011images} & BIG 2015 \cite{ronen2018big2015} \\
 \midrule
-Source & \todo{Kaggle mirror, version} & Kaggle competition (train set) \\
+% DATA: Kaggle "ikrambenabd/malimg-original", version 1
+Source & \fillin{Kaggle mirror, version} & Kaggle competition (train set) \\
 Samples used & 9,339 (9,458 in \cite{nataraj2011images}) & 2,041 of 10,868 \\
 Families & 25 & 9 \\
 Input format & pre-rendered grayscale PNG & \texttt{.bytes} hex dumps (no PE headers) \\
 Rendering & none (as shipped) & width table of \cite{nataraj2011images}; \texttt{??} dropped \\
-Sampling & all & $\le$250 per family; all 42 Simda \\
+Sampling & all & $\le$250 per family (seed 620); all 42 Simda \\
 Used in & E1, E2, E4 & E3 \\
 \bottomrule
 \end{tabular}}
 \end{table}
-\todo{Datasets prose}
+
 \subsection{Deduplication and Splits}
-\todo{}
+\textbf{Exact duplicates.} We hash each image's pixels with SHA-256.
+% DATA: Malimg exact-duplicate groups: 8,019 distinct images among 9,339 (14.9 % of
+%   images share their exact pixels with another image). Largest group: all 800
+%   Yuner.A images (one image). Source: results/dedup_threshold/summary.json row
+%   "threshold 0"; e1 info n_exact_duplicate_groups = 8019.
+Malimg contains only \fillin{8,019} distinct images: \fillin{14.9\%} of all images are an
+exact copy of another, and every one of the 800 Yuner.A images is the same image.
+BIG~2015, by contrast, contains no exact duplicates in our subset.
+
+\textbf{Near duplicates.} Two samples are near duplicates if the Euclidean distance
+between their GIST descriptors is below a threshold $\tau$; groups are closed
+transitively (union-find). We set $\tau$ from the distribution of each image's
+distance to its nearest neighbour, not from classification accuracy.
+% DATA: Malimg nearest-neighbour (NN) GIST distance bins (results/dedup_threshold/
+%   summary.json "nn_bins"): exactly 0: 1,002 images; (0, 0.02): 1,630; [0.02, 0.05):
+%   275; [0.05, 0.07): 233; [0.07, 0.09): 139; [0.09, 0.12): 1,364; [0.12, 0.15):
+%   3,450; [0.15, 0.20): 687; >= 0.20: 559. NN is in the same family: 100 % for every
+%   bin below 0.12, then 99.1 %, 86.8 %, 76.7 %. Median NN distance 0.120.
+The distribution has a spike of copies near zero, a valley around
+\fillin{0.07}, and a mode at the typical same-family distance of about \fillin{0.12};
+every nearest neighbour closer than \fillin{0.12} belongs to the same family. We chose
+$\tau = 0.05$, below the valley. Visual inspection of nearest-neighbour pairs confirms
+that pairs below about 0.08 are near copies, while pairs around 0.12 (e.g.\ within
+Allaple) share only a layout. Table~\ref{tab:dedup} shows that the conclusions are
+stable for $\tau$ between 0.03 and 0.09.
+% DATA: at tau = 0.05 Malimg has 6,629 groups and 31.1 % of images are in a group of
+%   two or more (dedup summary row 0.05; e2 info n_groups = 6629). BIG 2015: 1,922
+%   groups for 2,041 samples (e3 info n_groups); Kelihos_ver3 has the highest share
+%   in groups (55.6 %).
+At $\tau = 0.05$, Malimg's 9,339 images form \fillin{6,629} groups and
+\fillin{31.1\%} of images belong to a group of two or more; BIG~2015's 2,041 samples
+form \fillin{1,922} groups.
+
+\textbf{Splits.} E1 uses stratified 10-fold cross-validation, a standard protocol
+(the protocol of~\cite{nataraj2011images} is not stated; A1).
+E2 and E3 use stratified grouped 10-fold cross-validation, which keeps every group in
+a single fold. Every experiment is repeated with five seeds (0--4) that change the
+fold assignment and model initialization; we report the mean and standard deviation
+over seeds of the out-of-fold predictions pooled within each seed.
+
+\textbf{Untestable families.} Grouping exposes a problem that a stratified split
+hides: when all of a family's samples fall into one group, the family is never in the
+training data while it is tested.
+% DATA: families that form a single group at tau = 0.05: Yuner.A (800 images, all
+%   identical), Autorun.K (106; at tau >= 0.01 it merges with Yuner.A - the only group
+%   that spans two families), Obfuscator.AD (142). Together 1,048 images; 8,291 Malimg
+%   images remain "testable". BIG 2015: none. (e2 info untestable_families;
+%   testable n_evaluated = 8291)
+At $\tau = 0.05$ this happens to \fillin{three} Malimg families: \fillin{Yuner.A,
+Autorun.K and Obfuscator.AD}. Autorun.K and Yuner.A even merge into one group, the only
+group that spans two families. Their recall under E2 is zero by construction, which
+says nothing about leakage, so we report E2 (and E4, which attacks the E2 models) both
+over all families and over the \fillin{8,291} images of the remaining
+``testable'' families (A25). No BIG~2015 family is affected.
+
 \subsection{Models}
-% Reproduction parameters: what [1] states vs. what we assumed (A1-A25, the same
-% tags as the comments in config.yaml). In the prose, point out that [1]'s
-% protocol is under-specified (split, k, input size, sub-band split), so no
-% exact reproduction is possible: an RQ1 finding; relate it to [16].
-% [1] defers GIST details to its own ref. [12]: check that this is [3] before
-% writing "following [3]".
+\textbf{GIST + $k$-NN.} We implemented GIST from scratch following~\cite{oliva2001gist}
+with the parameters of~\cite{nataraj2011images}: 20 Gabor sub-bands over four scales
+and a $4 \times 4$ grid, giving 320 features. Each image is resized to $64 \times 64$,
+log-transformed, whitened and contrast-normalized, padded, and filtered in the
+frequency domain; the magnitude of each response is averaged over the grid. The
+descriptor feeds a 3-nearest-neighbour classifier with Euclidean distance and no
+feature scaling. Nataraj et al.\ leave several choices unstated: the split, $k$, the
+input size and how the 20 sub-bands divide among the four scales. They also refer
+the reader elsewhere for GIST's internal constants. Table~\ref{tab:assumptions}
+separates what~\cite{nataraj2011images} states from what we assumed. An exact
+reproduction is therefore impossible, which is itself a finding in the sense
+of~\cite{arp2022dos}.
+% Check before submitting: [1] defers GIST details to its own ref. [12]; confirm that
+% this is Oliva & Torralba [3] (refs.bib: oliva2001gist).
+
+\textbf{ResNet-50.} An ImageNet-pretrained ResNet-50~\cite{he2016resnet} with a new
+final layer is fine-tuned end to end. Byteplots are resized to $224 \times 224$ with
+antialiased bilinear interpolation, replicated to three channels and normalized with
+ImageNet statistics. We train for 5 epochs with AdamW (learning rate $10^{-4}$, weight
+decay $10^{-4}$, batch size 64), mixed precision and a class-weighted cross-entropy
+loss to counter family imbalance. We use no data augmentation, so that every model
+sees the same images; some published CNN results on Malimg use augmentation
+(Table~\ref{tab:published}).
+
+\textbf{Byte histogram + LR.} The normalized 256-bin histogram of byte values,
+standardized on the training fold, feeds a multinomial logistic regression ($C = 1$).
+It discards all spatial structure and serves as a test of how easy the benchmark is.
+
+% A9-A19 reasons: the prefilter (A13-A16), padding (A18), pooling (A17), response
+% magnitude (A19), centre frequencies (A9) and orientation range (A12) follow the
+% reference GIST implementation of [3]. The radial and angular widths (A10, A11) are
+% our own choice: A11 makes neighbouring orientations cross at half maximum (FWHM =
+% 2.355 sigma = pi/n, the spacing). Plotting the bank showed dips between scales with
+% sigma = 0.2 (A10). VERIFY against the reference code (LMgist createGabor) before
+% claiming either matches it.
 \begin{table}[t]
 \centering
 \caption{Reproduction parameters: stated in~\cite{nataraj2011images} vs.\ assumed (A$n$).}
@@ -168,66 +378,81 @@ Used in & E1, E2, E4 & E3 \\
  & Feature length & 320 ($=M\cdot M\cdot N$) & stated \cite{nataraj2011images} \\
  & Classifier / distance & $k$-NN / Euclidean & stated \cite{nataraj2011images} \\
 \midrule
-A1 & Folds & stratified 10-fold & not stated; \todo{reason} \\
-A2 & GIST input size & $64\times64$ & not stated; \todo{reason} \\
-A3 & $k$ & 3 & not stated; \todo{reason} \\
-A4 & Orientations per scale & 8, 4, 4, 4 (fine$\rightarrow$coarse) & total of 20 stated, split not; \todo{reason} \\
-A5 & Kilobyte & 1,024 bytes & not stated \\
+A1 & Folds & stratified 10-fold, 5 seeds & not stated; standard $k$-fold protocol \\
+A2 & GIST input size & $64\times64$ & not stated; keeps GIST cheap (not varied) \\
+A3 & $k$ & 3 & not stated; small odd $k$ avoids two-way ties \\
+A4 & Orientations per scale & 8, 4, 4, 4 (fine$\rightarrow$coarse) & total of 20 stated; keeps the stated 8 at the finest scale \\
+A5 & Kilobyte & 1,024 bytes & not stated; binary convention \\
 A6 & Width-table bounds & lower bound inclusive & \todo{check wording of [1]'s table} \\
 A7 & Averaging window $w$ & block mean, $4\times4$ & window not specified \\
 A8 & Partial last row & zero-padded & not stated \\
-% A9-A12: Gabor filter bank (src/features.py, _filter_bank). Constants follow the
-% reference GIST implementation of [3]; cite it when you fill in the reasons.
-A9  & Filter centre frequencies & 0.3 cycles/px, $\div 1.85$ per scale & \todo{reason} \\
-A10 & Radial bandwidth & Gaussian, $\sigma = 0.2$ on $r/f_c - 1$ & \todo{reason} \\
-A11 & Angular bandwidth & Gaussian, $\sigma = (\pi/n)/2.355$ & \todo{reason} \\
-A12 & Orientation range & one-sided, $0$--$180^\circ$, $0^\circ$ = horizontal freq. & \todo{reason} \\
-% A13-A16: prefilter (src/features.py, _prefilter), also from the reference
-% GIST implementation of [3].
-A13 & Intensity transform & scale to 0--255, then $\log(x+1)$ & \todo{reason} \\
-A14 & Border padding & 5\,px, symmetric (mirror) & \todo{reason} \\
-A15 & Whitening & Gaussian low-pass, cut-off 4 cycles/image, subtracted & \todo{reason} \\
-A16 & Local contrast normalisation & same Gaussian, divide by $0.2 + \sigma_{\text{local}}$ & \todo{reason} \\
-% A17-A19: filtering and pooling (src/features.py, gist and _block_mean).
-A17 & Spatial pooling & non-overlapping $4\times4$ block means, row-major; side divisible by 4 & \todo{reason} \\
-A18 & Padding before Gabor filtering & 32\,px, symmetric, cropped after & \todo{reason} \\
-A19 & Filter response & magnitude $|\cdot|$ of the complex output & \todo{reason} \\
-% A20-A23: E4 append attacks (src/attack.py).
-A20 & Append budget unit & byteplot pixels, incl.\ zero-padded last row (A8) & \todo{reason} \\
-A21 & Donor bytes (other-family) & contiguous run at random offset; donor repeated if too short & \todo{reason} \\
-% A22 pilot (scripts/fgsm_eps_pilot.py): ResNet-18, 3 epochs, 128 px, trained on a
-% random 3,000-image Malimg subset (seed 0), 100 other images attacked at a 5% budget.
-% Fraction of images whose loss rose vs. zero-append: eps 0.01 98%, 0.05 95%, 0.2 80%,
-% 0.5 32%, 1.0 58%. Accuracy after FGSM: 0.53, 0.35, 0.59, 0.91, 0.90 (zero-append 0.73).
-% The pilot model is separate from the evaluation models, but its images come from the
-% same dataset: say so.
-A22 & FGSM & single step, untargeted, cross-entropy, $\epsilon = 0.05$, from zero bytes; appended bytes only & \todo{reason; pilot} \\
-A23 & Attacker knowledge & white-box, gradient through the CNN's resize and normalisation & \todo{reason} \\
-% A24: evidence in scripts/dedup_threshold.py (results/dedup_threshold/summary.txt,
-% pairs.png) and Table~\ref{tab:dedup}. Malimg: nearest-neighbour distance histogram
-% has a duplicate spike near 0, a valley at ~0.07 and the typical same-family distance
-% at ~0.12; every nearest neighbour below 0.12 is in the same family. Pairs below ~0.08
-% look like near-copies (pairs.png); Allaple pairs at ~0.12 share a layout only.
-% State that the value was set from the distance distribution, not from accuracy, and
-% that Table~\ref{tab:dedup} shows the result is stable from 0.03 to 0.09.
-A24 & Near-duplicate threshold & GIST distance $< 0.05$, merged transitively & \todo{reason} \\
-A25 & Single-group families & excluded from E2/E3/E4 headline metrics; all-family numbers also reported & \todo{reason} \\
+A9  & Filter centre frequencies & 0.3 cycles/px, $\div 1.85$ per scale & reference GIST code \cite{oliva2001gist} \\
+A10 & Radial bandwidth & Gaussian, $\sigma = 0.2$ on $r/f_c - 1$ & our choice (see text) \\
+A11 & Angular bandwidth & Gaussian, $\sigma = (\pi/n)/2.355$ & our choice: neighbours cross at half max. \\
+A12 & Orientation range & one-sided, $0$--$180^\circ$, $0^\circ$ = horizontal freq. & reference GIST code \cite{oliva2001gist} \\
+A13 & Intensity transform & scale to 0--255, then $\log(x+1)$ & reference GIST code \cite{oliva2001gist} \\
+A14 & Border padding & 5\,px, symmetric (mirror) & reference GIST code \cite{oliva2001gist} \\
+A15 & Whitening & Gaussian low-pass, cut-off 4 cycles/image, subtracted & reference GIST code \cite{oliva2001gist} \\
+A16 & Local contrast normalisation & same Gaussian, divide by $0.2 + \sigma_{\text{local}}$ & reference GIST code \cite{oliva2001gist} \\
+A17 & Spatial pooling & non-overlapping $4\times4$ block means, row-major & reference GIST code \cite{oliva2001gist} \\
+A18 & Padding before Gabor filtering & 32\,px, symmetric, cropped after & reference GIST code \cite{oliva2001gist} \\
+A19 & Filter response & magnitude $|\cdot|$ of the complex output & reference GIST code \cite{oliva2001gist} \\
+A20 & Append budget unit & byteplot pixels, incl.\ zero-padded last row (A8) & Malimg has no binaries, only images \\
+A21 & Donor bytes (other-family) & contiguous run at random offset; repeated if too short & avoids always copying a header \\
+A22 & FGSM & single step, untargeted, cross-entropy, $\epsilon = 0.05$; appended bytes only & $\epsilon$ from a separate pilot (see text) \\
+A23 & Attacker knowledge & white-box, gradient through resize and normalisation & worst case for the defender \\
+A24 & Near-duplicate threshold & GIST distance $< 0.05$, merged transitively & below the NN-distance valley (Table~\ref{tab:dedup}) \\
+A25 & Single-group families & excluded from E2/E4 headline metrics; all-family numbers also reported & never in training when tested \\
 \bottomrule
 \end{tabular}}
 \end{table}
-\todo{Models prose}
+
 \subsection{Threat Model and Attacks}
-\todo{}
+The attacker controls a malware sample and wants it assigned to the wrong family
+(untargeted evasion) without changing its behaviour. The only manipulation allowed is
+appending bytes to the end of the file, which preserves functionality for PE
+files~\cite{demetrio2021exemples,kolosnjaji2018adversarial}. The budget is the number
+of appended bytes as a fraction of the original size: 1, 2, 5 and 10\%. After
+appending, the file is re-rendered with the width table, so the image may change
+width as well as height; for Malimg, which has no binaries, we treat the image's
+pixels as the file's bytes (A20). We attack the E2 models on their own test folds.
+
+Three black-box attacks need no knowledge of the model: \emph{random} appends uniform
+random bytes, \emph{zero} appends zero bytes, and \emph{other family} appends a
+contiguous run of bytes taken at a random offset from a training sample of a
+different family. One white-box attack targets the CNN: \emph{FGSM} starts from
+appended zeros and takes one step of size $\epsilon$ along the sign of the loss
+gradient, applied only to the appended pixels, with the gradient flowing through the
+CNN's resize and normalization (A22, A23). We chose $\epsilon$ on a separate pilot
+model, not on the evaluation models.
+% DATA: FGSM pilot (scripts/fgsm_eps_pilot.py): ResNet-18, 3 epochs, 128 px, trained on
+%   a random 3,000-image Malimg subset (seed 0); 100 other images attacked at a 5 %
+%   budget. Share of images whose loss rose vs. zero-appending / accuracy after FGSM:
+%   eps 0.01: 98 % / 0.53; 0.05: 95 % / 0.35; 0.2: 80 % / 0.59; 0.5: 32 % / 0.91;
+%   1.0: 58 % / 0.90. Clean accuracy 1.00; zero-append accuracy 0.73.
+On a ResNet-18 trained on 3,000 Malimg images, $\epsilon = 0.05$ was the strongest
+step, reducing accuracy at a 5\% budget to \fillin{0.35} against \fillin{0.73} for
+plain zero appending, while $\epsilon = 1.0$ overshoots and reaches only
+\fillin{0.90}. The pilot model is separate from the evaluation models but uses images
+from the same dataset.
+
 \subsection{Metrics and Statistics}
-% Experimental setup (state it, with the hardware): all reported numbers come from
-% config.yaml, 5 seeds x 10 folds, run on lovegood.cs.rit.edu with 10 NVIDIA Tesla
-% T4 GPUs (16 GB each; 48 CPU cores), one (experiment, seed) job per GPU: 15 jobs.
-% Wall-clock 2 h 12 min (8 Nov 2026); 12.9 GPU-hours in total (about 13 h on one T4).
-% Mean per job: E1 27.5 min, E2 + E4 attacks 121 min, E3 6 min. ResNet-50 fine-tuning
-% and FGSM ran on the GPU; GIST, k-NN, the byte histogram and the black-box attacks
-% on the CPU. Source: results/<exp>/runs/seed*.json ("seconds"), metrics.json
-% ("compute_seconds"), and the run log.
-\todo{}
+We report accuracy and macro-averaged precision, recall, F1 and one-vs-rest ROC-AUC,
+so that each family counts equally regardless of size, plus per-family recall.
+Paired differences between models on the same predictions are tested with an exact
+McNemar test for each seed. For E4 we report accuracy and evasion rate (the share of
+correctly classified test samples that the attack makes misclassified) at each
+budget, and summarize each curve by a robustness AUC: the area under accuracy versus
+budget, normalized so that 100 means no degradation.
+% DATA: all numbers come from config.yaml (5 seeds x 10 folds), run on
+%   lovegood.cs.rit.edu with 10 NVIDIA Tesla T4 GPUs (16 GB each; 48 CPU cores), one
+%   (experiment, seed) job per GPU, 15 jobs. Wall-clock 2 h 12 min (8 Nov 2026,
+%   14:25:14-16:37:20); 12.9 GPU-hours in total (about 13 h on one T4). Mean per job:
+%   E1 27.5 min, E2 + E4 attacks 121 min, E3 6 min. ResNet-50 and FGSM ran on the GPU;
+%   GIST, k-NN, the byte histogram and the black-box attacks on the CPU.
+All experiments ran on a server with \fillin{10 NVIDIA Tesla T4} GPUs, one experiment
+and seed per GPU; the complete run took \fillin{2 h 12 min} of wall-clock time
+(\fillin{12.9} GPU-hours).
 
 % ---------------------------------------------------------------- V (2.0 p)
 \section{Results}
@@ -239,18 +464,45 @@ A25 & Single-group families & excluded from E2/E3/E4 headline metrics; all-famil
 \end{table}
 
 \subsection{RQ1: Reproduction}
-% If you run the optional sensitivity check over the unstated values (A2 input
-% size, A3 k, A4 sub-band split; see Table~\ref{tab:assumptions}), report how
-% much accuracy moves across them here.
-\todo{}
+Table~\ref{tab:main} (E1) answers RQ1.
+% DATA: E1 GIST+kNN: acc 97.46 +- 0.04 (\EOneGistKnnAcc), macro precision 93.67 +- 0.12,
+%   recall 93.66 +- 0.08, F1 93.56 +- 0.09 (\EOneGistKnnFone), ROC-AUC 98.70 +- 0.06.
+GIST + $k$-NN reaches \fillin{97.46\%} accuracy, within about half a point of the
+$\approx$98\% reported in~\cite{nataraj2011images}, with a very small spread across
+seeds (\fillin{$\pm$0.04}). Given that~\cite{nataraj2011images} used 119 more images and
+does not state its split, $k$ or input size, we consider the reproduction successful.
+
+Accuracy hides a weakness that~\cite{nataraj2011images}, which reports only accuracy,
+could not show.
+% DATA: E1 GIST+kNN macro-F1 93.56 (\EOneGistKnnFone). Weakest families (E1 GIST
+%   recall): Swizzor.gen!I 38.3 %, Swizzor.gen!E 50.8 %, C2LOP.P 72.6 %, C2LOP.gen!g
+%   91.9 %; every other family >= 97.3 %. Same families for the CNN: 82.0, 86.2, 93.7,
+%   97.6 %.
+Its macro-F1 is \fillin{93.56\%}, because recall collapses on a few closely related
+families: \fillin{38.3\%} for Swizzor.gen!I, \fillin{50.8\%} for Swizzor.gen!E,
+\fillin{72.6\%} for C2LOP.P and \fillin{91.9\%} for C2LOP.gen!g, which are mostly
+confused with their sibling variants. All other families exceed 97\%. Accuracy is dominated by the large, easy families
+(Allaple.A alone is 32\% of Malimg).
+
+% DATA: E1 CNN: acc 99.29 +- 0.04 (\EOneCnnAcc), F1 98.15 +- 0.11 (\EOneCnnFone),
+%   ROC-AUC 99.96. E1 byte hist + LR: acc 96.82 +- 0.09 (\EOneByteHistLrAcc),
+%   F1 97.29 +- 0.09 (\EOneByteHistLrFone), ROC-AUC 99.81.
+%   Published CNNs on Malimg: 98.52 % [4], 98.82 % [7].
+The fine-tuned ResNet-50 reaches \fillin{99.29\%} accuracy and \fillin{98.15\%}
+macro-F1, in line with or above the 98.52--98.82\% reported for fine-tuned
+CNNs~\cite{kalash2018mcnn,vasan2020imcfn}, and it lifts the hard Swizzor and C2LOP
+families to 82--98\% recall. The most telling result, however, is the weak baseline: a
+byte histogram with logistic regression, which knows nothing about where bytes occur,
+reaches \fillin{96.82\%} accuracy, less than a point below GIST + $k$-NN, and a
+\emph{higher} macro-F1 (\fillin{97.29\%}).
+% DATA: McNemar, E1, all 5 seeds: GIST vs CNN p <= 8.3e-31 (mean per seed: GIST-only
+%   correct 26, CNN-only 196); GIST vs byte hist p <= 0.017 (249 vs 190); CNN vs byte
+%   hist p <= 1.1e-37 (272 vs 42).
+All pairwise differences are significant in every seed (McNemar, $p \le$
+\fillin{0.017}). On Malimg under a stratified split, a texture descriptor is barely
+needed: much of the family signal is in the byte distribution itself.
+
 \subsection{RQ2: Duplicates and Leakage}
-% KEY FINDING for the prose: all 800 Yuner.A images are pixel-identical (8.6% of
-% Malimg), and at the 0.05 threshold Autorun.K (merges with Yuner.A, the only
-% cross-family group) and Obfuscator.AD also collapse into single groups. A grouped
-% split never trains on these families when it tests them, so the all-family E2
-% drop mostly measures "unseen family", not leakage. The testable-family numbers
-% (dagger in Table~\ref{tab:main}) isolate the leakage effect. Pilot with GIST + 3-NN:
-% exact-only grouping gives the same accuracy as E1 once Yuner.A is excluded.
 \begin{table}[t]
 \centering
 \caption{Sensitivity to the near-duplicate threshold (A24), Malimg.}
@@ -263,18 +515,82 @@ A25 & Single-group families & excluded from E2/E3/E4 headline metrics; all-famil
 \label{tab:perfamily}
 \resizebox{\columnwidth}{!}{\inputgen{table_per_family.tex}}
 \end{table}
-\todo{}
+Over all families, the grouped split looks devastating:
+% DATA: E2 all families: GIST acc 84.29 +- 0.04 (\ETwoGistKnnAccAll), CNN 87.91 +- 0.09
+%   (\ETwoCnnAccAll), byte hist 84.93 +- 0.05 (\ETwoByteHistLrAccAll).
+GIST + $k$-NN falls from 97.46\% to \fillin{84.29\%}, the CNN to \fillin{87.91\%} and
+the byte histogram to \fillin{84.93\%}. Most of this drop, however, comes from the three
+untestable families, which are 11\% of Malimg and score zero by construction. The
+testable-family columns (marked $\dagger$ in Table~\ref{tab:main}) isolate the
+effect of duplicates:
+% DATA: E2 testable families (8,291 images): GIST acc 94.95 +- 0.05 (\ETwoGistKnnAcc),
+%   F1 86.65 +- 0.12 (\ETwoGistKnnFone); CNN acc 99.03 +- 0.10 (\ETwoCnnAcc), F1 97.51
+%   +- 0.34 (\ETwoCnnFone); byte hist acc 95.67 +- 0.06 (\ETwoByteHistLrAcc), F1 95.67
+%   +- 0.17 (\ETwoByteHistLrFone).
+%   Drops vs E1 (acc / F1, points): GIST -2.51 / -6.91; CNN -0.26 / -0.64;
+%   byte hist -1.15 / -1.62.
+GIST + $k$-NN loses \fillin{2.5} points of accuracy (to \fillin{94.95\%}) and
+\fillin{6.9} points of macro-F1 (to \fillin{86.65\%}), the byte histogram
+\fillin{1.2} and \fillin{1.6} points, and the CNN only \fillin{0.3} and \fillin{0.6}.
+Leakage therefore inflates the nearest-neighbour method far more than the CNN, which
+fits how each works: $k$-NN succeeds whenever a near copy of the test image is in the
+training set, whereas the CNN learns features that transfer to unseen variants.
+
+Table~\ref{tab:perfamily} shows where this happens.
+% DATA: per-family recall E1 -> E2, GIST + kNN: Dontovo.A 100.0 -> 0.6 (99.4 % of its
+%   162 images are in duplicate groups; CNN stays at 100.0); Wintrim.BX 100.0 -> 89.7
+%   (85.6 % in groups); Lolyda.AA2 97.3 -> 92.3 (94.0 % in groups). Families with no
+%   duplicates barely move (e.g. Swizzor.gen!I 38.3 -> 37.9, C2LOP.P 72.6 -> 72.1).
+The clearest case is Dontovo.A: \fillin{99.4\%} of its images sit in duplicate groups,
+and GIST + $k$-NN recall falls from \fillin{100\%} to \fillin{0.6\%}, while the CNN keeps
+\fillin{100\%}. Wintrim.BX (\fillin{100\%} to \fillin{89.7\%}) and Lolyda.AA2
+(\fillin{97.3\%} to \fillin{92.3\%}) follow the same pattern, whereas families without
+duplicates, including the hard Swizzor and C2LOP variants, barely change.
+% DATA: threshold sensitivity (Table dedup): exact-only grouping -> GIST acc all
+%   88.89 %, testable 97.21 % (only Yuner.A untestable); tau 0.01 -> 86.02 / 95.26;
+%   0.03 -> 84.46 / 95.13; 0.05 -> 84.29 / 94.95; 0.07 -> 84.34 / 95.00; 0.09 ->
+%   84.26 / 94.91.
+Table~\ref{tab:dedup} shows why near-duplicate grouping matters: with exact duplicates
+alone, testable accuracy is \fillin{97.21\%}, indistinguishable from E1, because the
+leaked pairs are near copies rather than identical files. From $\tau = 0.03$ to $0.09$
+testable accuracy stays between \fillin{94.91\%} and \fillin{95.13\%}, so the
+conclusion does not depend on the exact threshold.
+
 \subsection{RQ3: Cross-Dataset}
-% MUST INCLUDE: BIG 2015 numbers are INDICATIVE ONLY against [4], [5]. Our
-% capped subset (<=250/family) is more balanced than the full training set, so
-% accuracy here is not directly comparable to full-dataset results. Point to
-% the "Comparable?" column of Table~\ref{tab:published}.
-\todo{}
+% DATA: E3 BIG 2015 (2,041 samples, grouped): GIST acc 90.43 +- 0.19
+%   (\EThreeGistKnnAcc), F1 88.02 +- 0.20 (\EThreeGistKnnFone); CNN acc 94.04 +- 0.21
+%   (\EThreeCnnAcc), F1 93.77 +- 0.46 (\EThreeCnnFone); byte hist acc 87.06 +- 0.21
+%   (\EThreeByteHistLrAcc), F1 84.92 +- 0.28 (\EThreeByteHistLrFone).
+%   Published BIG 2015 (full set, different protocol): 99.97 % [4].
+On BIG~2015 the ranking from Malimg holds, but every model loses ground: the CNN
+reaches \fillin{94.04\%} accuracy (\fillin{93.77\%} macro-F1), GIST + $k$-NN
+\fillin{90.43\%} (\fillin{88.02\%}), and the byte histogram \fillin{87.06\%}
+(\fillin{84.92\%}).
+% DATA: CNN - GIST accuracy gap: E1 1.83 points; E2 testable 4.08; E3 3.61.
+%   Byte hist vs GIST accuracy: E2 testable 95.67 vs 94.95 (hist ahead); E3 87.06 vs
+%   90.43 (hist 3.37 points behind).
+The CNN's lead over GIST + $k$-NN (\fillin{3.6} points) is similar to the one under
+the grouped split on Malimg (\fillin{4.1}), but the byte histogram, which matched GIST
++ $k$-NN on Malimg, now falls \fillin{3.4} points behind it: spatial texture carries
+more information on BIG~2015 than on Malimg.
+% DATA: E3 per-family recall (GIST / CNN / byte hist): Ramnit 87.6/93.9/89.5;
+%   Lollipop 92.2/94.6/58.6; Kelihos_ver3 99.6/88.3/99.6; Vundo 96.3/97.8/97.0;
+%   Simda (42 samples) 62.9/91.4/84.8; Tracur 85.5/94.7/92.0; Kelihos_ver1
+%   95.8/96.0/89.0; Obfuscator.ACY 75.7/90.6/86.9; Gatak 95.4/97.0/84.4.
+The weakest families differ by model: GIST + $k$-NN struggles most with Simda
+(\fillin{62.9\%}, only 42 samples) and Obfuscator.ACY (\fillin{75.7\%}), the byte
+histogram with Lollipop (\fillin{58.6\%}), and the CNN, unusually, with Kelihos\_ver3
+(\fillin{88.3\%}), where the other two models exceed 99\%.
+These numbers are indicative only when compared with published BIG~2015 results such
+as 99.97\%~\cite{kalash2018mcnn}: those use the full, imbalanced training set and
+different splits, while our capped subset is more balanced and our split is grouped
+(Table~\ref{tab:published}).
+
 \subsection{RQ4: Robustness}
 \begin{figure*}[t]
 \centering
 \figgen{e4_budget_curves.png}{\textwidth}
-\caption{Accuracy vs.\ append budget (mean $\pm$ std over seeds).}
+\caption{Accuracy vs.\ append budget on the E2 test folds, testable families (mean $\pm$ std over seeds).}
 \label{fig:budget}
 \end{figure*}
 \begin{table}[t]
@@ -283,52 +599,133 @@ A25 & Single-group families & excluded from E2/E3/E4 headline metrics; all-famil
 \label{tab:robust}
 \resizebox{\columnwidth}{!}{\inputgen{table_robustness.tex}}
 \end{table}
-\todo{}
+Figure~\ref{fig:budget} and Table~\ref{tab:robust} answer RQ4. GIST + $k$-NN is
+remarkably fragile to the cheapest possible attack.
+% DATA: E4, GIST + kNN, accuracy at budgets 0 / 1 / 2 / 5 / 10 %:
+%   zero:         94.95 / 73.79 / 52.35 / 58.55 / 21.23   (evasion 0 / 23.3 / 46.9 / 40.3 / 78.7 %; AUC 51.3)
+%   random:       94.95 / 94.45 / 91.04 / 86.93 / 72.68   (evasion at 10 %: 24.3 %; AUC 85.3)
+%   other family: 94.95 / 92.19 / 86.70 / 82.11 / 69.16   (evasion at 10 %: 28.1 %; AUC 81.4)
+Appending zeros worth 1\% of the file lowers its accuracy from \fillin{94.95\%} to
+\fillin{73.79\%} and at 10\% to \fillin{21.23\%} (robustness AUC \fillin{51.3}), with
+\fillin{78.7\%} of previously correct samples evaded. Random and other-family bytes
+are much weaker (AUC \fillin{85.3} and \fillin{81.4}). A plausible explanation is that
+a block of zeros adds a large uniform region, which changes the low-frequency
+content that GIST summarizes far more than noise does. The zero-attack curve is not
+monotonic (\fillin{52.35\%} at 2\% but \fillin{58.55\%} at 5\%); we did not isolate the
+cause, but re-rendering can change the image width and the resize to $64 \times 64$
+changes the aspect ratio, so the effect of a budget depends on the file size.
+% DATA: E4, CNN, accuracy at 0 / 1 / 2 / 5 / 10 %:
+%   random 99.03 / 98.84 / 98.06 / 96.69 / 77.19 (AUC 92.4); zero 99.03 / 98.84 / 97.67
+%   / 95.12 / 75.01 (AUC 91.2); other family 99.03 / 98.84 / 97.99 / 96.47 / 77.12
+%   (AUC 92.3); FGSM 99.03 / 98.76 / 97.09 / 93.85 / 73.53 (AUC 90.2; evasion at
+%   10 %: 26.0 %).
+The CNN is far more robust: it loses less than two points up to a 2\% budget and stays
+above \fillin{93.8\%} at 5\% under every attack, but all attacks bring it to
+\fillin{73.5--77.2\%} at 10\%. Because random, zero and other-family bytes have almost
+the same effect at 10\%, the drop seems to come from the change in image geometry
+rather than from the appended content. White-box FGSM is only slightly stronger than
+the black-box attacks (AUC \fillin{90.2} versus \fillin{91.2--92.4}), which is
+consistent with its single small step (A22); an iterative attack would be stronger.
+% DATA: E4, byte hist + LR: zero 95.67 / 95.00 / 93.45 / 84.59 / 65.05 (AUC 83.1);
+%   random ... / 80.83 at 10 % (AUC 89.0); other family ... / 81.38 (AUC 88.8).
+The byte histogram falls between the two (AUC \fillin{83.1} for zeros, \fillin{89.0}
+and \fillin{88.8} for random and other-family bytes): appended bytes shift its
+histogram directly, but in proportion to the budget.
 
 % ---------------------------------------------------------------- VI (0.9 p)
 \section{Discussion}
-% Is Malimg still a useful benchmark? Why GIST and CNN converge on easy data;
-% robustness gap and deployment; [16]'s pitfalls applied to the literature [15], [16].
-\todo{Discussion}
+\textbf{Is Malimg still a useful benchmark?} Our results suggest that it is useful
+for checking that a pipeline works, but not for ranking methods. A 256-bin histogram
+nearly matches a texture descriptor; one family is a single image repeated 800 times
+and two others collapse into single groups once near duplicates are merged; and the
+headline accuracy of the nearest-neighbour method owes part of its value to near
+copies shared between training and test folds. These are the sampling-bias and
+data-snooping pitfalls described by Arp et al.~\cite{arp2022dos}, and they apply to
+every paper in Table~\ref{tab:published} that uses a random split.
+
+\textbf{Why do GIST and the CNN converge on Malimg?} Under a stratified split both
+approaches can rely on memorizing near copies, so the benchmark compresses their
+differences into the last two points of accuracy. Remove that crutch (E2) or change
+the dataset (E3), and the gap roughly doubles: under the grouped split the CNN keeps
+its accuracy while GIST + $k$-NN loses most on precisely the families with many near
+duplicates. Macro-F1 and
+per-family recall expose the gap that accuracy hides, and we recommend reporting them.
+
+\textbf{Robustness and deployment.} A classifier that appending 1\% zero bytes can
+defeat is not suitable for deployment against an adversary, however accurate it is on
+clean data. The CNN's robustness is better but not complete: at a 10\% budget roughly a
+quarter of correct predictions are evaded by any attack. Because appending is free for
+an attacker and preserves functionality, image-based classifiers should be evaluated
+against it by default.
 
 % ---------------------------------------------------------------- VII (0.4 p)
 \section{Limitations and Threats to Validity}
-% No timestamps (no temporal split) [15]; Malimg ships images not binaries, so
-% functionality of perturbed files cannot be verified; small family count; compute.
-% Compute: a from-scratch run needs 12.9 GPU-hours (2 h 12 min on 10 T4s), so the
-% repository's quick check re-merges committed per-seed results instead of
-% recomputing them (appendix "Code and Reproducibility").
-% MUST INCLUDE:
-%  - Unverified mirror: we cannot confirm the Malimg mirror is identical to the
-%    authors' original data (count already differs: 9,339 vs 9,458).
-%  - Storage limits: disk space, not a methodological choice, is why a BIG 2015
-%    subset (2,041 of 10,868) was used instead of the full set.
-%  - IF E3 IS DROPPED: say so here, and move cross-dataset testing to Future Work.
-\todo{Limitations}
+\textbf{Data provenance.} We could not obtain Malimg from its original source, and we
+cannot confirm that the mirror we used is identical to the authors' data; its image
+count already differs (9,339 versus 9,458). For BIG~2015, storage limits, not a
+methodological choice, forced us to use a 2,041-sample subset rather than the full
+10,868-sample training set; our BIG~2015 results are therefore indicative only.
+
+\textbf{Reproduction choices.} Several parameters of~\cite{nataraj2011images} are
+unstated, and our assumptions (Table~\ref{tab:assumptions}) may differ from the
+original. We did not vary the GIST input size, $k$ or the division of sub-bands
+among scales, so we cannot rule out that another choice would close the remaining
+half-point gap.
+
+\textbf{Threat model.} Malimg provides images, not binaries, so we treat image pixels
+as file bytes and cannot verify that a perturbed file still runs. Our FGSM is a single
+step chosen on a pilot model that shares the evaluation dataset; it is a lower bound
+on what a white-box attacker can do.
+
+\textbf{Temporal and family coverage.} Neither dataset has timestamps, so we cannot
+test the temporal bias that TESSERACT~\cite{pendlebury2019tesseract} identifies, and
+25 and 9 families are far fewer than a vendor sees.
+
+\textbf{Compute.} A from-scratch run needs \fillin{12.9} GPU-hours, so the repository's
+one-command check re-merges committed per-seed results instead of recomputing them
+(Appendix~\ref{app:repro}).
 
 % ---------------------------------------------------------------- VIII (0.3 p)
 \section{Conclusion and Future Work}
-% Answers to RQ1--RQ4; stronger attacks [13], [14]; time-aware datasets.
-% IF E3 IS DROPPED: cross-dataset testing on BIG 2015 becomes future work.
-\todo{Conclusion}
+We reproduced the GIST + $k$-NN malware-image classifier of Nataraj et al.\ to within
+about half a point of its reported accuracy (RQ1), but found that the benchmark it
+introduced overstates what the method can do. Duplicate-aware splitting removes
+\fillin{6.9} points of macro-F1 from GIST + $k$-NN on the families that can be tested,
+against \fillin{0.6} for a fine-tuned ResNet-50 (RQ2); the ranking holds on BIG~2015,
+where all models lose accuracy (RQ3); and a 1\% append of zero bytes evades about a
+quarter of GIST + $k$-NN's correct predictions (RQ4). Future work should test stronger,
+iterative and mask-guided attacks~\cite{zhan2023amgmal,tariq2026framework}, include
+binaries so that functionality can be verified, and evaluate on time-stamped datasets
+with temporal splits~\cite{pendlebury2019tesseract}.
 
 \bibliographystyle{IEEEtran}
 \bibliography{refs}
 
 \appendices
-\section{Code and Reproducibility}
-% Repo URL + tag; `make reproduce` (config.yaml) vs `make quick`; which produced the numbers.
-% - All numbers: config.yaml (5 seeds x 10 folds), lovegood.cs.rit.edu, 10 x Tesla T4,
-%   2 h 12 min wall-clock (8 Nov 2026), 12.9 GPU-hours; commit 9e6d66a.
-% - `make reproduce` (no datasets needed, ~13 s): reuses the committed per-seed results
-%   (each stamped with its config fingerprint and commit) and regenerates
-%   results/metrics.json and every table in report/generated/.
-% - `make reproduce-scratch`: recomputes everything from the datasets (about 13 h on
-%   one T4); scripts/lovegood/run_parallel.sh is the 10-GPU version.
-% - Datasets: manual download (data/README.md); not redistributable.
-\todo{}
+\section{Code and Reproducibility}\label{app:repro}
+% DATA: repository URL https://github.com/Fussyness/csec-620-research-paper-432004751 ;
+%   submission tag: create it with `git tag <project>-final` (STUDENT_GUIDE.md section 6).
+All code, configurations and per-seed results are available at
+\fillin{repository URL} (tag \fillin{tag}). Every number and table in this paper is
+generated from the configuration \texttt{config.yaml} (5 seeds $\times$ 10 folds).
+\texttt{make reproduce} needs no datasets and finishes in seconds: it reuses the
+committed per-seed results, each stamped with a fingerprint of the configuration and
+the commit it was produced from, and regenerates \texttt{results/metrics.json} and
+every table. \texttt{make reproduce-scratch} recomputes everything from the datasets
+(about 13~h on one T4 GPU), and a provided script runs the same jobs in parallel on a
+multi-GPU server. The datasets must be downloaded manually as described in
+\texttt{data/README.md}; they cannot be redistributed.
+
 \section{AI Use and Statement of Original Work}
-% Required by the assignment. Log every substantive AI use (see SUBMISSION.md).
-\todo{}
+% Edit this to match what you actually did; it is your statement.
+This project used Claude (Anthropic) as an assistant. It helped find and verify
+references and plan the experiments (Milestone~2); scaffolded the experiment
+pipeline (data loading, deduplication and folds, model wrappers, evaluation, tables,
+tests and configurations), the parallel-run scripts, the FGSM step-size pilot and the
+near-duplicate threshold analysis; and drafted the text of this paper from the
+author's results. The GIST descriptor and the append and FGSM attacks were written by
+the author, with step-by-step guidance and review from the assistant. The author
+chose the research questions, ran the experiments, checked every number against the
+results, and \fillin{describe your edits to the draft}.
 
 \end{document}

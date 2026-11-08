@@ -65,8 +65,7 @@ per-family table, the threshold sensitivity table) is generated from `results/` 
 - Final draft (2 Nov 2026): Claude (Anthropic) scaffolded the experiment pipeline in this
   repo (data loading, dedup and folds, ResNet/k-NN/LR wrappers, evaluation, tables,
   tests, configs) and the LaTeX skeleton and `.bib`. GIST (`src/features.py: gist`) and the
-  attacks (`src/attack.py`) were written by the author. The paper's prose, analysis, and
-  argument are the author's own.
+  attacks (`src/attack.py`) were written by the author.
 - Later (Nov 2026), also by Claude: the lovegood parallel-run scripts
   (`scripts/lovegood/`), the FGSM step-size pilot (`scripts/fgsm_eps_pilot.py`), the
   near-duplicate threshold analysis (`scripts/dedup_threshold.py`), the testable-family
@@ -74,3 +73,6 @@ per-family table, the threshold sensitivity table) is generated from `results/` 
   walked the author through implementing GIST and the attacks step by step, reviewing
   and testing each piece; the code in those two files was typed and written by the
   author.
+- Paper (Nov 2026): Claude drafted the body text of `report/main.tex` from the
+  author's results, leaving the result values as marked gaps for the author to fill
+  in and check. [Author: describe your own edits here.]
