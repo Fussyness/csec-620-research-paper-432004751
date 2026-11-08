@@ -37,10 +37,10 @@ Anything non-default the grader must know:
   "Reproducing".
 - `make reproduce-scratch` needs both datasets in `data/` (manual download, see
   `data/README.md`) and a GPU.
-- Full run: about 2.1 h wall-clock on lovegood.cs.rit.edu with 10 x Tesla T4 (15
-  jobs in parallel, one GPU each; the longest, an E2 seed with the E4 attacks, took
-  2.05 h), plus a few minutes to build the caches. 12.9 GPU-hours in total, so about
-  13 h on a single T4. Mean time per job: E1 27.5 min, E2 + E4 121 min, E3 6 min
+- Full run: 2 h 12 min wall-clock (8 Nov 2026, 14:25:14-16:37:20, including the
+  cache build and the merge) on lovegood.cs.rit.edu with 10 x Tesla T4 (15 jobs in
+  parallel, one GPU each; the longest, an E2 seed with the E4 attacks, took 2.05 h).
+  12.9 GPU-hours in total, so about 13 h on a single T4. Mean time per job: E1 27.5 min, E2 + E4 121 min, E3 6 min
   (the `seconds` field of each `results/<exp>/runs/seed*.json`).
 - `make quick` (config.quick.yaml, 1 seed, 5 folds) was not timed end to end; from
   the per-job times above it is roughly 1-1.5 h on one T4.
