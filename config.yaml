@@ -27,6 +27,9 @@ data:
   big2015_dir: data/extracted     # train/<Id>.bytes + trainLabels.csv; only extracted ids are used
   big2015_ids: data/big2015_subset.txt  # committed list of the 2,042 sample ids used (null = all extracted)
   big2015_subset: null     # int → further stratified subset (applied after big2015_ids)
+  # Samples left out of the subset list, with the reason. Every byte of
+  # fRLS3aKkijp4GH0Ds6Pv (Ramnit) is "??", so nothing is left once "??" is dropped.
+  big2015_exclude: [fRLS3aKkijp4GH0Ds6Pv]
   cache_dir: data/cache
   # [1] width table: file size in KB → byteplot width; [upper bound (exclusive), width].
   # A5: 1 KB = 1,024 bytes. A6: a range's lower bound is inclusive. A8: last row zero-padded.

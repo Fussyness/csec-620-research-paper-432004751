@@ -109,10 +109,11 @@ def parse_bytes_file(path) -> bytes:
 
 
 def load_big2015(root: str, cache_dir: str, width_table, ids_file: str | None,
-                 subset: int | None, seed: int) -> ImageSet:
+                 subset: int | None, seed: int, exclude=()) -> ImageSet:
     """BIG 2015 training set: `<root>/train/<Id>.bytes` and `<root>/trainLabels.csv`.
 
     Each file is rendered once and cached at `<cache_dir>/big2015_png/<Id>.png`.
+    `exclude` lists ids to leave out (e.g. files whose bytes are all `??`).
     """
     root, png_dir = Path(root), Path(cache_dir) / "big2015_png"
     label_csv = root / "trainLabels.csv"
@@ -133,6 +134,10 @@ def load_big2015(root: str, cache_dir: str, width_table, ids_file: str | None,
         present = wanted
     else:
         print(f"  [big2015] using the {len(present)} extracted of {len(rows)} labelled samples")
+    if exclude:
+        dropped = present & set(exclude)
+        present = present - set(exclude)
+        print(f"  [big2015] excluded {len(dropped)} sample(s) listed in data.big2015_exclude")
     rows = [r for r in rows if r[0] in present]
     ids = np.array([r[0] for r in rows])
     labels = np.array([r[1] - 1 for r in rows], dtype=np.int64)   # classes are 1..9
@@ -146,7 +151,11 @@ def load_big2015(root: str, cache_dir: str, width_table, ids_file: str | None,
     def loader(i):
         png = png_dir / f"{ids[i]}.png"
         if not png.exists():
-            img = byteplot(parse_bytes_file(root / "train" / f"{ids[i]}.bytes"), width_table)
+            raw = parse_bytes_file(root / "train" / f"{ids[i]}.bytes")
+            if not raw:
+                raise ValueError(f"BIG 2015 sample {ids[i]} has no known bytes (every entry is "
+                                 f"'??'), so it cannot be rendered. Add it to data.big2015_exclude.")
+            img = byteplot(raw, width_table)
             tmp = png.with_suffix(f".{os.getpid()}.tmp.png")
             Image.fromarray(img).save(tmp)
             os.replace(tmp, png)              # atomic: parallel jobs never see a partial PNG
@@ -195,7 +204,7 @@ def load_dataset(name: str, cfg: dict) -> ImageSet:
         return load_malimg(d["malimg_dir"])
     if name == "big2015":
         return load_big2015(d["big2015_dir"], d["cache_dir"], d["width_table"], d.get("big2015_ids"),
-                            d.get("big2015_subset"), seed=0)
+                            d.get("big2015_subset"), seed=0, exclude=d.get("big2015_exclude") or ())
     raise ValueError(f"unknown dataset {name!r}")
 
 

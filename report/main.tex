@@ -67,7 +67,7 @@ malware classification, byteplot, GIST, reproducibility, data leakage, adversari
 % itself. A row that differs from ours in ANY column is "indicative only".
 % - Sample counts: give each published number's own dataset count (Malimg is
 %   9,458 in [1] but 9,339 in our copy and in [14]).
-% - Every BIG 2015 row is indicative only: our 2,042-sample capped subset is
+% - Every BIG 2015 row is indicative only: our 2,041-sample capped subset is
 %   more balanced than the full 10,868-sample training set used in [4], [5].
 \begin{table*}[t]
 \centering
@@ -88,7 +88,7 @@ Work & Dataset & Method & Samples & Split protocol & Preprocessing / size & Metr
 \cite{gibert2019cnn} & BIG 2015 & CNN & \todo{} & \todo{} & \todo{} & \todo{} & \todo{} & Indicative (subset) \\
 \midrule
 This work (E1) & Malimg & see Table~\ref{tab:main} & 9,339 & stratified 10-fold & \todo{} & Acc., macro-F1 & Table~\ref{tab:main} & -- \\
-This work (E3) & BIG 2015 & see Table~\ref{tab:main} & 2,042 & grouped 10-fold & width table [1] & Acc., macro-F1 & Table~\ref{tab:main} & -- \\
+This work (E3) & BIG 2015 & see Table~\ref{tab:main} & 2,041 & grouped 10-fold & width table [1] & Acc., macro-F1 & Table~\ref{tab:main} & -- \\
 \bottomrule
 \end{tabular}}
 \end{table*}
@@ -115,9 +115,11 @@ This work (E3) & BIG 2015 & see Table~\ref{tab:main} & 2,042 & grouped 10-fold &
 %    dataset's creators.
 %  - "??" entries: DROPPED (removed before rendering, not mapped to 0); see
 %    src/data.py: parse_bytes_file. Say this changes byte offsets slightly.
+%    One subset sample (fRLS3aKkijp4GH0Ds6Pv, Ramnit) is "??" throughout, so it has
+%    no bytes left; it is excluded (config data.big2015_exclude): 2,041 used.
 %  - Rendering: .bytes -> byteplot with [1]'s width table; last partial row
 %    zero-padded (assumption); src/data.py: byteplot.
-%  - Subset: up to 250 per family, all 42 Simda kept -> 2,042 samples.
+%  - Subset: up to 250 per family, all 42 Simda kept -> 2,042 listed, 2,041 used.
 %    State the rule: \todo{fixed seed N / method}. The id list is committed as
 %    data/big2015_subset.txt and read by the loader (config data.big2015_ids),
 %    so the exact subset can be recreated.
@@ -131,7 +133,7 @@ This work (E3) & BIG 2015 & see Table~\ref{tab:main} & 2,042 & grouped 10-fold &
  & Malimg \cite{nataraj2011images} & BIG 2015 \cite{ronen2018big2015} \\
 \midrule
 Source & \todo{Kaggle mirror, version} & Kaggle competition (train set) \\
-Samples used & 9,339 (9,458 in \cite{nataraj2011images}) & 2,042 of 10,868 \\
+Samples used & 9,339 (9,458 in \cite{nataraj2011images}) & 2,041 of 10,868 \\
 Families & 25 & 9 \\
 Input format & pre-rendered grayscale PNG & \texttt{.bytes} hex dumps (no PE headers) \\
 Rendering & none (as shipped) & width table of \cite{nataraj2011images}; \texttt{??} dropped \\
@@ -289,7 +291,7 @@ A25 & Single-group families & excluded from E2/E3/E4 headline metrics; all-famil
 %  - Unverified mirror: we cannot confirm the Malimg mirror is identical to the
 %    authors' original data (count already differs: 9,339 vs 9,458).
 %  - Storage limits: disk space, not a methodological choice, is why a BIG 2015
-%    subset (2,042 of 10,868) was used instead of the full set.
+%    subset (2,041 of 10,868) was used instead of the full set.
 %  - IF E3 IS DROPPED: say so here, and move cross-dataset testing to Future Work.
 \todo{Limitations}
 
