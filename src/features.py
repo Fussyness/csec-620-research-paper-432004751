@@ -15,6 +15,68 @@ def resize(img: np.ndarray, size: int) -> np.ndarray:
     im = Image.fromarray(img).resize((size, size), Image.BILINEAR)
     return np.asarray(im, dtype=np.float32) / 255.0
 
+def _frequency_grid(size):
+    freqList = np.fft.fftfreq(size)
+    x, y = np.meshgrid(freqList, freqList)
+    freqRadius = np.hypot(x, y)
+    angleGrid = np.arctan2(y, x)
+    return freqRadius, angleGrid
+
+def _filter_bank(size, orientation):
+    radius, angle = _frequency_grid(size)
+    petals = []
+    for i, n in enumerate(orientation):
+        fc = 0.3/(1.85**i)
+        angleWidth = (np.pi / n) / 2.355
+        for j in range(n):
+            theta = np.pi * j / n
+            difference = angle - theta
+            angleDiff = np.angle(np.exp(1j * difference))
+            distance = radius / fc - 1
+            radialBell = np.exp(-(distance**2) / (2 * 0.2**2))
+            angleBell = (np.exp(-(angleDiff**2) / (2 * angleWidth**2)))
+            combineBells = radialBell * angleBell
+            petals.append(combineBells)
+    return np.stack(petals)
+
+def _prefilter(img):
+    pad = 5
+    mult = img * 255
+    logged = np.log(mult + 1)
+    padded = np.pad(logged, pad, mode="symmetric")
+    size = padded.shape[0]
+    grid, _ = _frequency_grid(size)
+    cycles = grid * size
+    s1 = 4 / np.sqrt(np.log(2))
+    mask = np.exp(-(cycles)**2 / s1**2)
+
+    def blur(a):
+        transformer = np.fft.fft2(a)
+        transMask = mask * transformer
+        invTrans = np.fft.ifft2(transMask)
+        real = np.real(invTrans)
+        return real
+
+    white = padded - blur(padded)
+
+
+    loud = np.sqrt(np.abs(blur((white**2))))
+    norm = white / (0.2 + loud)
+
+    slicedNorm = norm[pad:-pad, pad:-pad]
+    return slicedNorm
+
+def _block_mean(response, blocks):
+    tile = response.shape[0] // blocks
+    means = []
+    for r in range(blocks):
+        for c in range(blocks):
+            rows = r * tile
+            columns = c * tile
+            block = response[rows:rows+tile, columns:columns+tile]
+            means.append(block.mean())
+    return np.array(means)
+    
 
 def gist(img: np.ndarray, gcfg: dict) -> np.ndarray:
     """GIST descriptor of one byteplot, following Oliva & Torralba [3] with the
@@ -25,13 +87,13 @@ def gist(img: np.ndarray, gcfg: dict) -> np.ndarray:
         gcfg: config["features"]["gist"], with
               image_size   side length the byteplot is resized to first
               orientations orientations per scale, finest first; its length
-                           is the number of scales (e.g. [8, 8, 4])
+                           is the number of scales (e.g. [8, 4, 4, 4])
               blocks       the filter-response maps are averaged over a
                            blocks x blocks grid
 
     Returns:
         1-D float32 vector of length sum(orientations) * blocks**2
-        (320 for [8, 8, 4] and a 4 x 4 grid). Deterministic: the same image
+        (320 for [8, 4, 4, 4] and a 4 x 4 grid). Deterministic: the same image
         must give the same vector.
 
     Suggested steps (see [3], Sec. 4, and [1], Sec. 4):
@@ -46,7 +108,30 @@ def gist(img: np.ndarray, gcfg: dict) -> np.ndarray:
     Record every value [1] does not state (prefilter width, Gabor bandwidth,
     padding) as an explicit assumption in the paper.
     """
-    raise NotImplementedError("GIST descriptor not implemented yet (src/features.py)")
+    
+    size = gcfg["image_size"]
+    orientations = gcfg["orientations"]
+    blocks = gcfg["blocks"]
+
+    resized = resize(img, size)
+    prefiltered = _prefilter(resized)
+
+    padding = 32
+    pad = np.pad(prefiltered, padding, mode="symmetric")
+    paddedSize = pad.shape[0]
+
+    transformer = np.fft.fft2(pad)
+    bank = _filter_bank(paddedSize, orientations)
+
+    features = []
+    for petal in bank:
+        filtered = np.fft.ifft2(petal * transformer)
+        magnitude = np.abs(filtered)
+        crop = magnitude[padding:-padding, padding:-padding]
+        pooled = _block_mean(crop, blocks)
+        features.append(pooled)
+
+    return np.concatenate(features).astype(np.float32)
 
 
 def gist_dim(gcfg: dict) -> int:

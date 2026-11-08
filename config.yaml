@@ -3,8 +3,9 @@
 #   config.quick.yaml  1 seed, fewer folds, BIG 2015 subset (inherits from this file)
 #   config.ci.yaml     synthetic data, tiny CNN; used by CI and the smoke tests
 #
-# Values marked [1]? are my reading of Nataraj et al. (2011) — verify each one
-# against the paper and list anything it does not state as an assumption.
+# Reproduction parameters are tagged "[1]" when Nataraj et al. (2011) state them,
+# or "A<n>" when [1] does not and the value is our assumption. A1-A19 are listed
+# with their reasons in report/main.tex (Table "Reproduction parameters").
 
 seeds: [0, 1, 2, 3, 4]
 
@@ -15,7 +16,7 @@ run:
   headline: [e1/gist_knn, e1/cnn, e1/byte_hist_lr]
 
 experiments:
-  e1: {dataset: malimg, split: stratified}   # RQ1: [1]'s protocol
+  e1: {dataset: malimg, split: stratified}   # RQ1: reproduction of [1] (split assumed, A1)
   e2: {dataset: malimg, split: grouped}      # RQ2: duplicates kept inside one fold
   e3: {dataset: big2015, split: grouped}     # RQ3: same pipeline, other dataset
   e4: {attack_on: e2}                        # RQ4: attacks on E2's test folds and models
@@ -27,13 +28,14 @@ data:
   big2015_ids: data/big2015_subset.txt  # committed list of the 2,042 sample ids used (null = all extracted)
   big2015_subset: null     # int → further stratified subset (applied after big2015_ids)
   cache_dir: data/cache
-  # [1]? Table 1, file size in KB → byteplot width; [upper bound (exclusive), width]
+  # [1] width table: file size in KB → byteplot width; [upper bound (exclusive), width].
+  # A5: 1 KB = 1,024 bytes. A6: a range's lower bound is inclusive. A8: last row zero-padded.
   width_table: [[10, 32], [30, 64], [60, 128], [100, 256], [200, 384],
                 [500, 512], [1000, 768], [null, 1024]]
   synthetic: {n_families: 5, per_family: 30, dup_rate: 0.2, min_kb: 2, max_kb: 40}
 
 splits:
-  n_folds: 10              # [1]? 10-fold cross-validation
+  n_folds: 10              # A1: [1] does not state its split; stratified 10-fold
 
 dedup:
   feature: gist            # gist | thumbnail — descriptor for near-duplicate distance
@@ -42,11 +44,20 @@ dedup:
   near_threshold: null
 
 features:
-  gist: {image_size: 64, orientations: [8, 8, 4], blocks: 4}   # [1]? → 320-D
+  # [1]: 4 scales, 8 orientations, N = 20 sub-bands, M = 4 (4x4 grid) → 320-D.
+  # A2: image_size (not stated in [1]). A4: split of the 20 sub-bands over the 4 scales,
+  # finest scale first (not stated in [1]). A7: block mean over the 4x4 grid.
+  # A9-A12 (filter shapes, fixed in src/features.py): centre 0.3 cycles/px /1.85 per
+  # scale, radial sigma 0.2, angular sigma (pi/n)/2.355, one-sided 0-180 deg.
+  # A13-A16 (prefilter, fixed in src/features.py): 0-255 + log(x+1), 5 px mirror pad,
+  # Gaussian whitening at 4 cycles/image, contrast normalisation with constant 0.2.
+  # A17-A19 (fixed in src/features.py): block means; 32 px mirror pad before the Gabor
+  # filters; response magnitude. image_size must be divisible by blocks.
+  gist: {image_size: 64, orientations: [8, 4, 4, 4], blocks: 4}
   thumbnail_size: 32
 
 models:
-  gist_knn: {k: 3}         # [1]? k = 3, Euclidean
+  gist_knn: {k: 3}         # [1]: k-NN, Euclidean. A3: k not stated in [1]
   byte_hist_lr: {C: 1.0, max_iter: 3000}
   cnn:
     backbone: resnet50     # torchvision name; resnet18 is a cheaper fallback

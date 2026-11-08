@@ -78,7 +78,7 @@ malware classification, byteplot, GIST, reproducibility, data leakage, adversari
 \toprule
 Work & Dataset & Method & Samples & Split protocol & Preprocessing / size & Metric & Reported & Comparable? \\
 \midrule
-\cite{nataraj2011images} & Malimg & GIST + $k$-NN & 9,458 & \todo{} & \todo{} & Acc. & $\approx$98\% & Indicative (count) \\
+\cite{nataraj2011images} & Malimg & GIST + $k$-NN & 9,458 & not stated & GIST 320-D; input size not stated & Acc. & $\approx$98\% & Indicative (count, split) \\
 \cite{kalash2018mcnn} & Malimg & VGG16 (M-CNN) & \todo{} & \todo{} & \todo{} & Acc. & 98.52\% & \todo{} \\
 \cite{gibert2019cnn} & Malimg & CNN & \todo{} & \todo{} & \todo{resizing method} & \todo{} & \todo{} & \todo{} \\
 \cite{vasan2020imcfn} & Malimg & Fine-tuned CNN, color & \todo{} & \todo{} & \todo{augmentation} & Acc. & 98.82\% & \todo{} \\
@@ -144,7 +144,56 @@ Used in & E1, E2, E4 & E3 \\
 \subsection{Deduplication and Splits}
 \todo{}
 \subsection{Models}
-\todo{}
+% Reproduction parameters: what [1] states vs. what we assumed (A1-A19, the same
+% tags as the comments in config.yaml). In the prose, point out that [1]'s
+% protocol is under-specified (split, k, input size, sub-band split), so no
+% exact reproduction is possible: an RQ1 finding; relate it to [16].
+% [1] defers GIST details to its own ref. [12]: check that this is [3] before
+% writing "following [3]".
+\begin{table}[t]
+\centering
+\caption{Reproduction parameters: stated in~\cite{nataraj2011images} vs.\ assumed (A$n$).}
+\label{tab:assumptions}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{llll}
+\toprule
+ & Parameter & Value used & Source / reason \\
+\midrule
+ & Byteplot width table & by file size in KB & stated \cite{nataraj2011images} \\
+ & GIST scales / orientations & 4 / 8 & stated \cite{nataraj2011images} \\
+ & GIST sub-bands $N$ & 20 & stated \cite{nataraj2011images} \\
+ & Spatial grid $M\times M$ & $4\times4$ & stated \cite{nataraj2011images} \\
+ & Feature length & 320 ($=M\cdot M\cdot N$) & stated \cite{nataraj2011images} \\
+ & Classifier / distance & $k$-NN / Euclidean & stated \cite{nataraj2011images} \\
+\midrule
+A1 & Folds & stratified 10-fold & not stated; \todo{reason} \\
+A2 & GIST input size & $64\times64$ & not stated; \todo{reason} \\
+A3 & $k$ & 3 & not stated; \todo{reason} \\
+A4 & Orientations per scale & 8, 4, 4, 4 (fine$\rightarrow$coarse) & total of 20 stated, split not; \todo{reason} \\
+A5 & Kilobyte & 1,024 bytes & not stated \\
+A6 & Width-table bounds & lower bound inclusive & \todo{check wording of [1]'s table} \\
+A7 & Averaging window $w$ & block mean, $4\times4$ & window not specified \\
+A8 & Partial last row & zero-padded & not stated \\
+% A9-A12: Gabor filter bank (src/features.py, _filter_bank). Constants follow the
+% reference GIST implementation of [3]; cite it when you fill in the reasons.
+A9  & Filter centre frequencies & 0.3 cycles/px, $\div 1.85$ per scale & \todo{reason} \\
+A10 & Radial bandwidth & Gaussian, $\sigma = 0.2$ on $r/f_c - 1$ & \todo{reason} \\
+A11 & Angular bandwidth & Gaussian, $\sigma = (\pi/n)/2.355$ & \todo{reason} \\
+A12 & Orientation range & one-sided, $0$--$180^\circ$, $0^\circ$ = horizontal freq. & \todo{reason} \\
+% A13-A16: prefilter (src/features.py, _prefilter), also from the reference
+% GIST implementation of [3].
+A13 & Intensity transform & scale to 0--255, then $\log(x+1)$ & \todo{reason} \\
+A14 & Border padding & 5\,px, symmetric (mirror) & \todo{reason} \\
+A15 & Whitening & Gaussian low-pass, cut-off 4 cycles/image, subtracted & \todo{reason} \\
+A16 & Local contrast normalisation & same Gaussian, divide by $0.2 + \sigma_{\text{local}}$ & \todo{reason} \\
+% A17-A19: filtering and pooling (src/features.py, gist and _block_mean).
+A17 & Spatial pooling & non-overlapping $4\times4$ block means, row-major; side divisible by 4 & \todo{reason} \\
+A18 & Padding before Gabor filtering & 32\,px, symmetric, cropped after & \todo{reason} \\
+A19 & Filter response & magnitude $|\cdot|$ of the complex output & \todo{reason} \\
+\bottomrule
+\end{tabular}}
+\end{table}
+\todo{Models prose}
 \subsection{Threat Model and Attacks}
 \todo{}
 \subsection{Metrics and Statistics}
@@ -160,6 +209,9 @@ Used in & E1, E2, E4 & E3 \\
 \end{table}
 
 \subsection{RQ1: Reproduction}
+% If you run the optional sensitivity check over the unstated values (A2 input
+% size, A3 k, A4 sub-band split; see Table~\ref{tab:assumptions}), report how
+% much accuracy moves across them here.
 \todo{}
 \subsection{RQ2: Duplicates and Leakage}
 \begin{table}[t]
