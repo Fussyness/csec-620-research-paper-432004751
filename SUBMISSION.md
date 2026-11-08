@@ -3,7 +3,7 @@
 Fill this in before submitting. The grading agent reads it first.
 
 ## Author
-- Name (RIT ID): sole author (individual graduate research paper)
+- Theodore DellaVilla (432004751)
 
 ## Course level
 - [ ] 520 (undergraduate)
@@ -37,17 +37,27 @@ Anything non-default the grader must know:
   "Reproducing".
 - `make reproduce-scratch` needs both datasets in `data/` (manual download, see
   `data/README.md`) and a GPU.
-- Full run took ____ h on ____ (lovegood.cs.rit.edu, __ x Tesla T4); about 14 h
-  on a single GPU. `make quick` (config.quick.yaml, 1 seed) takes ____.
+- Full run: about 2.1 h wall-clock on lovegood.cs.rit.edu with 10 x Tesla T4 (15
+  jobs in parallel, one GPU each; the longest, an E2 seed with the E4 attacks, took
+  2.05 h), plus a few minutes to build the caches. 12.9 GPU-hours in total, so about
+  13 h on a single T4. Mean time per job: E1 27.5 min, E2 + E4 121 min, E3 6 min
+  (the `seconds` field of each `results/<exp>/runs/seed*.json`).
+- `make quick` (config.quick.yaml, 1 seed, 5 folds) was not timed end to end; from
+  the per-job times above it is roughly 1-1.5 h on one T4.
 - Reported numbers come from: `config.yaml` (5 seeds x 10 folds).
 - ImageNet weights for ResNet-50 are downloaded by torchvision on first run.
 
 ## Claimed results
 Headline = E1 (stratified 10-fold, Malimg), GIST + k-NN, mean over seeds; must match
 `results/metrics.json`. Metrics are macro-averaged over families; ROC-AUC is one-vs-rest.
-- Accuracy:
-- Precision / Recall / F1 (macro):
-- ROC-AUC (macro OvR):
+Values are mean ± std over the 5 seeds, in %.
+- Accuracy: 97.46 ± 0.04 (Nataraj et al. report 98%)
+- Precision / Recall / F1 (macro): 93.67 ± 0.12 / 93.66 ± 0.08 / 93.56 ± 0.09
+- ROC-AUC (macro OvR): 98.70 ± 0.06
+
+Every other number in the paper (E2-E4, the CNN and byte-histogram baselines, the
+per-family table, the threshold sensitivity table) is generated from `results/` into
+`report/generated/` by `make reproduce`.
 
 ## AI-use acknowledgment
 - Milestone 2: Claude (Anthropic) helped find and verify references, draft first-pass
@@ -57,3 +67,10 @@ Headline = E1 (stratified 10-fold, Malimg), GIST + k-NN, mean over seeds; must m
   tests, configs) and the LaTeX skeleton and `.bib`. GIST (`src/features.py: gist`) and the
   attacks (`src/attack.py`) were written by the author. The paper's prose, analysis, and
   argument are the author's own.
+- Later (Nov 2026), also by Claude: the lovegood parallel-run scripts
+  (`scripts/lovegood/`), the FGSM step-size pilot (`scripts/fgsm_eps_pilot.py`), the
+  near-duplicate threshold analysis (`scripts/dedup_threshold.py`), the testable-family
+  metrics, and the resume-from-committed-results path of `make reproduce`. It also
+  walked the author through implementing GIST and the attacks step by step, reviewing
+  and testing each piece; the code in those two files was typed and written by the
+  author.
