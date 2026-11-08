@@ -16,12 +16,15 @@ Parallel use (e.g. one GPU per job, see scripts/lovegood/):
   --experiments e2 --seeds 0   run one slice; writes only its runs/seed0.json
   --merge                      combine all runs/seed*.json into the summaries
 
-Without --experiments/--seeds the run does everything and merges at the end.
+Without --experiments/--seeds the run does everything and merges at the end. It
+resumes: seeds whose runs/seed<s>.json already exists for the same settings (config
+fingerprint) are reused, so with the committed results it only merges, in seconds
+and without the datasets. --fresh recomputes everything.
 Parts that are not implemented yet (GIST, the attacks) are skipped and listed
 under "skipped" in metrics.json instead of failing the run.
 """
 from __future__ import annotations
-import argparse, hashlib, json, os, random, time
+import argparse, hashlib, json, os, random, subprocess, time
 from itertools import combinations
 
 import numpy as np
@@ -53,6 +56,32 @@ def load_config(path: str) -> dict:
     if parent:
         cfg = _merge(load_config(os.path.join(os.path.dirname(path), parent)), cfg)
     return cfg
+
+
+# Settings that cannot change any result: where things are stored, which seeds and
+# experiments this invocation lists, and which number is the headline. Everything
+# else in the config is part of the fingerprint.
+_NOT_RESULTS = {("output",), ("seeds",), ("run", "experiments"), ("run", "headline"),
+                ("data", "cache_dir"), ("data", "malimg_dir"), ("data", "big2015_dir")}
+
+
+def config_fingerprint(cfg: dict) -> str:
+    """Short hash of every result-affecting setting. Stored in each per-seed result,
+    so a result made with other settings is never reused by mistake."""
+    def strip(d, path=()):
+        return {k: strip(v, path + (k,)) if isinstance(v, dict) else v
+                for k, v in d.items() if path + (k,) not in _NOT_RESULTS}
+    return hashlib.sha1(json.dumps(strip(cfg), sort_keys=True).encode()).hexdigest()[:12]
+
+
+def _git_commit():
+    """Commit the result was produced from (provenance only; None outside git)."""
+    try:
+        p = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True,
+                           text=True, timeout=10, cwd=os.path.dirname(os.path.abspath(__file__)))
+        return p.stdout.strip() or None
+    except (OSError, subprocess.SubprocessError):
+        return None
 
 
 def set_seed(seed: int):
@@ -230,7 +259,8 @@ def run_seed(exp, seed, prepared, cfg, out, skipped, attack_exp):
     # the other families are kept); attack metrics use the same subset.
     untestable = [ds.families.index(f) for f in info.get("untestable_families", [])]
     testable = ~np.isin(y, untestable)
-    record = {"exp": exp, "seed": seed, "info": info, "models": {}, "attack": {},
+    record = {"exp": exp, "seed": seed, "config_fingerprint": config_fingerprint(cfg),
+              "git_commit": _git_commit(), "info": info, "models": {}, "attack": {},
               "mcnemar": [], "skipped": []}
     preds = {}
     for m in models:
@@ -372,8 +402,35 @@ def summarize(cfg, out, config_path, extra_skipped=()):
         print(f"SKIPPED {s['what']}: {s['reason']}")
 
 
+# ---------------------------------------------------------------- resume
+def _reusable(out, exp, seed, fingerprint) -> bool:
+    """True if <out>/<exp>/runs/seed<seed>.json is a complete result for these settings.
+    A result made with different settings stops the run instead of being reused."""
+    p = os.path.join(out, exp, "runs", f"seed{seed}.json")
+    if not os.path.exists(p):
+        return False
+    with open(p) as f:
+        rec = json.load(f)
+    if rec.get("skipped"):
+        print(f"  {p}: incomplete (skipped {[s['what'] for s in rec['skipped']]}); recomputing")
+        return False
+    got = rec.get("config_fingerprint")
+    if got is None:
+        print(f"  {p}: no settings fingerprint (made before fingerprinting); reusing")
+    elif got != fingerprint:
+        raise SystemExit(
+            f"{p} was produced with different settings (fingerprint {got}, current config "
+            f"{fingerprint}). Delete it, or run with --fresh to recompute everything.")
+    return True
+
+
 # ---------------------------------------------------------------- main
-def main(config_path: str, experiments=None, seeds=None, prepare=False, merge=False):
+def main(config_path: str, experiments=None, seeds=None, prepare=False, merge=False,
+         fresh=False):
+    """Without --experiments/--seeds this is the full run, and it RESUMES: a seed whose
+    result file already exists for the same settings is reused, not recomputed. With
+    every result present (e.g. committed to the repo) it only merges, in seconds and
+    without the datasets. `fresh=True` recomputes everything."""
     cfg = load_config(config_path)
     out = cfg["output"]["dir"]; os.makedirs(out, exist_ok=True)
     if merge:
@@ -390,13 +447,22 @@ def main(config_path: str, experiments=None, seeds=None, prepare=False, merge=Fa
                              f"here (choose from {to_train}; attacks run with their base)")
         to_train = [e for e in to_train if e in experiments]
     run_seeds = seeds if seeds is not None else cfg["seeds"]
+    resume = experiments is None and seeds is None and not prepare and not fresh
+    fingerprint = config_fingerprint(cfg)
 
     skipped = []
     for exp in to_train:
+        todo = [s for s in run_seeds if not (resume and _reusable(out, exp, s, fingerprint))]
+        if not todo:
+            print(f"\n=== {exp}: results for seeds {run_seeds} already in {out}/{exp}/runs/ "
+                  f"(settings {fingerprint}); reusing them. Use --fresh to recompute.")
+            continue
+        if len(todo) < len(run_seeds):
+            print(f"\n=== {exp}: reusing seeds {sorted(set(run_seeds) - set(todo))}; computing {todo}")
         prepared = prepare_experiment(exp, specs[exp], cfg, out, skipped)
         if prepared is None or prepare:
             continue
-        for seed in run_seeds:
+        for seed in todo:
             run_seed(exp, seed, prepared, cfg, out, list(skipped), attack_of.get(exp))
     if prepare:
         print("\nCaches ready.", *(f"SKIPPED {s['what']}: {s['reason']}" for s in _dedupe(skipped)),
@@ -415,5 +481,7 @@ if __name__ == "__main__":
     ap.add_argument("--seeds", nargs="+", type=int, help="run only these seeds")
     ap.add_argument("--prepare", action="store_true", help="build descriptor caches only")
     ap.add_argument("--merge", action="store_true", help="summarise existing per-seed runs")
+    ap.add_argument("--fresh", action="store_true",
+                    help="recompute every seed, even those with an existing result file")
     a = ap.parse_args()
-    main(a.config, a.experiments, a.seeds, a.prepare, a.merge)
+    main(a.config, a.experiments, a.seeds, a.prepare, a.merge, a.fresh)

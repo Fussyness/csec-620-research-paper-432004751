@@ -60,18 +60,21 @@ CUDA_VISIBLE_DEVICES=0 .venv/bin/python -m src.train --config config.yaml --expe
 .venv/bin/python -m src.train --config config.yaml --merge && .venv/bin/python -m src.tables --results results
 ```
 
-## 3. Bring results back
+## 3. Bring results back and commit them
 
-From your laptop:
+From your laptop (repo root), replace the local results with the server's:
 
 ```bash
 scp -r USER@lovegood.cs.rit.edu:csec-620-research-paper-432004751/results .
-make tables                      # regenerate report/generated/ locally
+make reproduce                   # reuses them: rebuilds metrics.json + report/generated/
+git add results report && git commit -m "Results of the full run" && git push
 ```
 
-`results/` stays gitignored. State in the paper and `SUBMISSION.md` that the
-reported numbers came from this server (10x T4, N GPUs used) and give the
-wall-clock time from the run log.
+`.gitignore` admits the small result files (`results/metrics.json`, `results/e*/`,
+`results/dedup_threshold/`) but not `results/splits/`. Committing them is what lets
+`make reproduce` finish in seconds for a grader without the datasets (README
+"Reproducing"). State in the paper and `SUBMISSION.md` that the reported numbers came
+from this server (10x T4, N GPUs used) and give the wall-clock time from the run log.
 
 ## Notes
 

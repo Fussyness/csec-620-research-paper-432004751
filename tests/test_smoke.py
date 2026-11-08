@@ -125,3 +125,22 @@ def test_end_to_end_ci_config(tmp_path):
         assert 0.0 <= m[k] <= 1.0
     assert "e1" in m["experiments"] and "e2" in m["experiments"]
     assert (tmp_path / "out" / "splits" / "e2_seed0.csv").exists()
+
+    # Resume: a second full run reuses the per-seed results instead of recomputing
+    # them, and still rebuilds metrics.json (this is what `make reproduce` does with
+    # the committed results).
+    run_file = tmp_path / "out" / "e1" / "runs" / "seed0.json"
+    rec = json.loads(run_file.read_text())
+    assert rec["config_fingerprint"]
+    before = run_file.stat().st_mtime_ns
+    (tmp_path / "out" / "metrics.json").unlink()
+    main(str(cfg_path))
+    assert run_file.stat().st_mtime_ns == before
+    m2 = json.loads((tmp_path / "out" / "metrics.json").read_text())
+    assert m2["accuracy"] == m["accuracy"]
+
+    # Results made with other settings are never reused silently.
+    changed = tmp_path / "changed.yaml"
+    changed.write_text(cfg_path.read_text() + "models: {gist_knn: {k: 5}}\n")
+    with pytest.raises(SystemExit, match="different settings"):
+        main(str(changed))

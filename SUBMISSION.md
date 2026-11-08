@@ -24,12 +24,22 @@ attacks, with a fine-tuned ResNet as the stronger baseline.
 ## How to reproduce
 ```bash
 make setup
-make reproduce      # full run, config.yaml
+make reproduce              # seconds, no data: rebuilds metrics.json + paper tables
+make reproduce-scratch      # hours, needs both datasets: recomputes everything
 ```
 Anything non-default the grader must know:
-- Needs both datasets in `data/` (manual download).
-- Full run takes ____ hours on a ____ GPU. `make quick` (config.quick.yaml, 1 seed) takes ____.
-- Reported numbers come from: `config.yaml` / `config.quick.yaml` (circle one).
+- `make reproduce` (what `grading/grade.py` runs) reuses the committed per-seed raw
+  results in `results/<exp>/runs/`. Each records the config fingerprint and git commit
+  it was produced with; a mismatching file stops the run instead of being reused. It
+  then recomputes every summary, `results/metrics.json` and the paper's tables from
+  them. It shows that the paper's numbers follow from the raw results, not that the
+  raw results can be recreated; that is what `make reproduce-scratch` does. See README
+  "Reproducing".
+- `make reproduce-scratch` needs both datasets in `data/` (manual download, see
+  `data/README.md`) and a GPU.
+- Full run took ____ h on ____ (lovegood.cs.rit.edu, __ x Tesla T4); about 14 h
+  on a single GPU. `make quick` (config.quick.yaml, 1 seed) takes ____.
+- Reported numbers come from: `config.yaml` (5 seeds x 10 folds).
 - ImageNet weights for ResNet-50 are downloaded by torchvision on first run.
 
 ## Claimed results
