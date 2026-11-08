@@ -19,10 +19,16 @@ mkdir -p "$LOGS"
 # Share the 48 CPU cores between the jobs instead of each job grabbing all of them.
 export OMP_NUM_THREADS=$(( $(nproc) / ${#GPUS[@]} > 1 ? $(nproc) / ${#GPUS[@]} : 1 ))
 export MKL_NUM_THREADS=$OMP_NUM_THREADS
+export PYTHONUNBUFFERED=1   # write log lines as they happen, not when a job ends
 
 # 1. Build descriptor caches once (rendering BIG 2015, GIST, resized CNN inputs).
-echo "[$(date +%T)] preparing caches"
-$PY -m src.train --config "$CONFIG" --prepare > "$LOGS/prepare.log" 2>&1
+echo "[$(date +%T)] preparing caches (about 20-30 min; follow with: tail -f $LOGS/prepare.log)"
+if ! $PY -m src.train --config "$CONFIG" --prepare > "$LOGS/prepare.log" 2>&1; then
+    echo "[$(date +%T)] FAILED preparing caches. Last lines of $LOGS/prepare.log:"
+    tail -n 25 "$LOGS/prepare.log"
+    exit 1
+fi
+echo "[$(date +%T)] caches ready"
 
 # 2. Job list: one line "EXP SEED" per job; experiments that carry attacks
 #    (the longest jobs) go first so they don't end up last in the queue.
