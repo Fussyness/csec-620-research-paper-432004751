@@ -178,10 +178,14 @@ appending a few gradient-chosen bytes evades MalConv, and Demetrio et
 al.~\cite{demetrio2021exemples} surveyed practical functionality-preserving attacks on
 Windows malware detectors, from appending to header and section manipulation.
 AMGmal~\cite{zhan2023amgmal} uses adaptive masks to minimize the perturbation needed
-to evade a detector. Tariq et al.~\cite{tariq2026framework} trained a detector with
-adversarial learning on the same 9,339-image version of Malimg that we use. To our
-knowledge, no prior work measures how the original GIST + $k$-NN pipeline responds to
-append attacks.
+to evade a detector. Tariq et al.~\cite{tariq2026framework}, using the same
+9,339-image version of Malimg as we do, balance the families with SVM-SMOTE, generate
+FGSM perturbations restricted by a PE-structure mask to slack and writable regions,
+and retrain on the adversarial samples. They report an 81\% evasion rate while
+modifying 0.284\% of bytes, with retraining restoring accuracy from 16\% to 97\%.
+Their evaluation uses a single random 80:20 split without deduplication, the setting
+our RQ2 examines. To our knowledge, no prior work measures how the original GIST +
+$k$-NN pipeline responds to append attacks.
 
 % Fair-comparison table (assignment requirement). Fill each \todo cell from the paper
 % itself; these values are not in this repository. A row that differs from ours in ANY
@@ -203,7 +207,13 @@ Work & Dataset & Method & Samples & Split protocol & Preprocessing / size & Metr
 \cite{kalash2018mcnn} & Malimg & VGG16 (M-CNN) & \todo{} & \todo{} & \todo{} & Acc. & 98.52\% & \todo{} \\
 \cite{gibert2019cnn} & Malimg & CNN & \todo{} & \todo{} & \todo{resizing method} & \todo{} & \todo{} & \todo{} \\
 \cite{vasan2020imcfn} & Malimg & Fine-tuned CNN, color & \todo{} & \todo{} & \todo{augmentation} & Acc. & 98.82\% & \todo{} \\
-\cite{tariq2026framework} & Malimg & \todo{} & 9,339 & \todo{} & oversampling & \todo{} & \todo{} & \todo{} \\
+% [14] Tariq et al. 2026, Sec. 7: custom 3-conv CNN (their Table 3, 64x64 input), 20
+%   epochs; single random 80:20 train/test split (70:30 train/val within train), one
+%   run, no deduplication. Clean accuracy 96.09 % without balancing, 98.39 % with
+%   SVM-SMOTE (their Table 5: weighted F1 97.84 %, AUC 99.59 %). Fig. 6 compares four
+%   balancing methods: SVM-SMOTE 98.39, VAE 96.95, Pro-WaS 96.34, AC-GAN 94.74 %.
+%   Whether oversampling preceded the split is not stated explicitly (Sec. 5.3.2 vs 7).
+\cite{tariq2026framework} & Malimg & 3-layer CNN + SVM-SMOTE$^*$ & 9,339 & single 80:20, 1 run & $64\times64$; oversampling & Acc. & 98.39\% & Indicative (oversampling, split) \\
 \midrule
 \cite{kalash2018mcnn} & BIG 2015 & VGG16 (M-CNN) & \todo{} & \todo{} & \todo{} & Acc. & 99.97\% & Indicative (subset) \\
 \cite{gibert2019cnn} & BIG 2015 & CNN & \todo{} & \todo{} & \todo{} & \todo{} & \todo{} & Indicative (subset) \\
@@ -212,6 +222,8 @@ This work (E1) & Malimg & see Table~\ref{tab:main} & 9,339 & stratified 10-fold,
 This work (E3) & BIG 2015 & see Table~\ref{tab:main} & 2,041 & grouped 10-fold, 5 seeds & width table [1] & Acc., macro-F1 & Table~\ref{tab:main} & -- \\
 \bottomrule
 \end{tabular}}
+\par\smallskip
+{\footnotesize $^*$Best of four class-balancing methods compared in~\cite{tariq2026framework} (SVM-SMOTE, VAE, Pro-WaS, AC-GAN; 98.39, 96.95, 96.34 and 94.74\%); 96.09\% without balancing.\par}
 \end{table*}
 
 % ---------------------------------------------------------------- IV (1.6 p)
