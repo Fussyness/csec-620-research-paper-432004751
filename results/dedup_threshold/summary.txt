@@ -1,0 +1,20 @@
+dataset malimg: 9339 samples, 25 families; configured threshold 0.05
+
+nearest-neighbour distance | samples | NN in same family
+  [0.00, 0.00) |   1002 | 1.000
+  [0.00, 0.02) |   1630 | 1.000
+  [0.02, 0.05) |    275 | 1.000
+  [0.05, 0.07) |    233 | 1.000
+  [0.07, 0.09) |    139 | 1.000
+  [0.09, 0.12) |   1364 | 1.000
+  [0.12, 0.15) |   3450 | 0.991
+  [0.15, 0.20) |    687 | 0.868
+  [0.20, inf) |    559 | 0.767
+
+threshold | groups | in a group | largest group | mixed groups | single-group families | acc all | acc testable
+  0.0      |   8019 |  14.9% |   800 {'Yuner.A': 800} | 0 | ['Yuner.A'] | 0.889 | 0.972
+  0.01     |   7096 |  25.8% |   906 {'Autorun.K': 106, 'Yuner.A': 800} | 1 | ['Autorun.K', 'Yuner.A'] | 0.860 | 0.953
+  0.03     |   6765 |  29.4% |   906 {'Autorun.K': 106, 'Yuner.A': 800} | 1 | ['Autorun.K', 'Obfuscator.AD', 'Yuner.A'] | 0.845 | 0.951
+  0.05     |   6629 |  31.1% |   906 {'Autorun.K': 106, 'Yuner.A': 800} | 1 | ['Autorun.K', 'Obfuscator.AD', 'Yuner.A'] | 0.843 | 0.949
+  0.07     |   6399 |  33.6% |   906 {'Autorun.K': 106, 'Yuner.A': 800} | 1 | ['Autorun.K', 'Obfuscator.AD', 'Yuner.A'] | 0.843 | 0.950
+  0.09     |   6250 |  35.1% |   906 {'Autorun.K': 106, 'Yuner.A': 800} | 1 | ['Autorun.K', 'Obfuscator.AD', 'Yuner.A'] | 0.843 | 0.949

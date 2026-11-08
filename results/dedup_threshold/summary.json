@@ -1,0 +1,154 @@
+{
+  "config_fingerprint": "8c94287047ed",
+  "dataset": "malimg",
+  "thresholds": [
+    0.0,
+    0.01,
+    0.03,
+    0.05,
+    0.07,
+    0.09
+  ],
+  "chosen": 0.05,
+  "n_folds": 10,
+  "n_seeds": 5,
+  "nn_bins": [
+    {
+      "lo": 0,
+      "hi": 1e-09,
+      "n": 1002,
+      "same_family": 1.0
+    },
+    {
+      "lo": 1e-09,
+      "hi": 0.02,
+      "n": 1630,
+      "same_family": 1.0
+    },
+    {
+      "lo": 0.02,
+      "hi": 0.05,
+      "n": 275,
+      "same_family": 1.0
+    },
+    {
+      "lo": 0.05,
+      "hi": 0.07,
+      "n": 233,
+      "same_family": 1.0
+    },
+    {
+      "lo": 0.07,
+      "hi": 0.09,
+      "n": 139,
+      "same_family": 1.0
+    },
+    {
+      "lo": 0.09,
+      "hi": 0.12,
+      "n": 1364,
+      "same_family": 1.0
+    },
+    {
+      "lo": 0.12,
+      "hi": 0.15,
+      "n": 3450,
+      "same_family": 0.9907246376811594
+    },
+    {
+      "lo": 0.15,
+      "hi": 0.2,
+      "n": 687,
+      "same_family": 0.8675400291120815
+    },
+    {
+      "lo": 0.2,
+      "hi": null,
+      "n": 559,
+      "same_family": 0.7674418604651163
+    }
+  ],
+  "rows": [
+    {
+      "threshold": 0.0,
+      "groups": 8019,
+      "share_in_group": 0.1485169718385266,
+      "largest_group": 800,
+      "mixed_groups": 0,
+      "single_group_families": [
+        "Yuner.A"
+      ],
+      "acc_all": 0.888853196273691,
+      "acc_testable": 0.9721278838271461
+    },
+    {
+      "threshold": 0.01,
+      "groups": 7096,
+      "share_in_group": 0.2577363743441482,
+      "largest_group": 906,
+      "mixed_groups": 1,
+      "single_group_families": [
+        "Autorun.K",
+        "Yuner.A"
+      ],
+      "acc_all": 0.8601777492236856,
+      "acc_testable": 0.952591011502431
+    },
+    {
+      "threshold": 0.03,
+      "groups": 6765,
+      "share_in_group": 0.2938216083092408,
+      "largest_group": 906,
+      "mixed_groups": 1,
+      "single_group_families": [
+        "Autorun.K",
+        "Obfuscator.AD",
+        "Yuner.A"
+      ],
+      "acc_all": 0.8445872149052361,
+      "acc_testable": 0.951344831745266
+    },
+    {
+      "threshold": 0.05,
+      "groups": 6629,
+      "share_in_group": 0.31127529714102153,
+      "largest_group": 906,
+      "mixed_groups": 1,
+      "single_group_families": [
+        "Autorun.K",
+        "Obfuscator.AD",
+        "Yuner.A"
+      ],
+      "acc_all": 0.8429382160830924,
+      "acc_testable": 0.9494873959715353
+    },
+    {
+      "threshold": 0.07,
+      "groups": 6399,
+      "share_in_group": 0.3362244351643645,
+      "largest_group": 906,
+      "mixed_groups": 1,
+      "single_group_families": [
+        "Autorun.K",
+        "Obfuscator.AD",
+        "Yuner.A"
+      ],
+      "acc_all": 0.8434093586037049,
+      "acc_testable": 0.9500180919068869
+    },
+    {
+      "threshold": 0.09,
+      "groups": 6250,
+      "share_in_group": 0.3511082557018953,
+      "largest_group": 906,
+      "mixed_groups": 1,
+      "single_group_families": [
+        "Autorun.K",
+        "Obfuscator.AD",
+        "Yuner.A"
+      ],
+      "acc_all": 0.8425741514080736,
+      "acc_testable": 0.9490773127487637
+    }
+  ]
+}

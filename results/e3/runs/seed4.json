@@ -1,0 +1,150 @@
+{
+  "exp": "e3",
+  "seed": 4,
+  "config_fingerprint": "8c94287047ed",
+  "git_commit": "9e6d66a",
+  "provenance": "Run on lovegood.cs.rit.edu (10x Tesla T4) from commit 9e6d66a, before results recorded fingerprints. Fingerprint and commit added afterwards; config.yaml is identical between 9e6d66a and 44a1580, and 44a1580 changed no computation.",
+  "info": {
+    "dataset": "big2015",
+    "n_samples": 2041,
+    "n_families": 9,
+    "families": [
+      "Ramnit",
+      "Lollipop",
+      "Kelihos_ver3",
+      "Vundo",
+      "Simda",
+      "Tracur",
+      "Kelihos_ver1",
+      "Obfuscator.ACY",
+      "Gatak"
+    ],
+    "split": "grouped",
+    "family_counts": [
+      249,
+      250,
+      250,
+      250,
+      42,
+      250,
+      250,
+      250,
+      250
+    ],
+    "n_exact_duplicate_groups": 2041,
+    "n_folds": 10,
+    "nn_distance_quantiles": {
+      "0.01": 0.005693203862756491,
+      "0.05": 0.022574106231331825,
+      "0.1": 0.053042590618133545,
+      "0.25": 0.07166976481676102,
+      "0.5": 0.12993766367435455
+    },
+    "near_threshold": 0.05,
+    "dedup_feature": "gist",
+    "n_groups": 1922,
+    "duplicate_rate_by_family": {
+      "Ramnit": 0.01606425702811245,
+      "Lollipop": 0.0,
+      "Kelihos_ver3": 0.556,
+      "Vundo": 0.0,
+      "Simda": 0.0,
+      "Tracur": 0.02,
+      "Kelihos_ver1": 0.008,
+      "Obfuscator.ACY": 0.064,
+      "Gatak": 0.056
+    },
+    "untestable_families": []
+  },
+  "models": {
+    "gist_knn": {
+      "accuracy": 0.9064184223419892,
+      "precision": 0.8833477638183685,
+      "recall": 0.8798459871230955,
+      "f1": 0.8800288764663318,
+      "roc_auc": 0.9637926854298399,
+      "per_family_recall": [
+        0.891566265060241,
+        0.924,
+        0.996,
+        0.964,
+        0.6190476190476191,
+        0.852,
+        0.964,
+        0.76,
+        0.948
+      ],
+      "fit_predict_seconds": 0.1354539394378662,
+      "n_evaluated": 2041
+    },
+    "cnn": {
+      "accuracy": 0.9397354238118569,
+      "precision": 0.938825341564603,
+      "recall": 0.9364969720150442,
+      "f1": 0.9367078438245182,
+      "roc_auc": 0.9963128081187755,
+      "per_family_recall": [
+        0.927710843373494,
+        0.944,
+        0.872,
+        0.976,
+        0.9047619047619048,
+        0.956,
+        0.964,
+        0.912,
+        0.972
+      ],
+      "fit_predict_seconds": 356.1786117553711,
+      "n_evaluated": 2041
+    },
+    "byte_hist_lr": {
+      "accuracy": 0.8716315531602156,
+      "precision": 0.8501906355832358,
+      "recall": 0.8659006820934532,
+      "f1": 0.8496736540907224,
+      "roc_auc": 0.941756189518958,
+      "per_family_recall": [
+        0.8955823293172691,
+        0.584,
+        0.996,
+        0.972,
+        0.8095238095238095,
+        0.92,
+        0.892,
+        0.88,
+        0.844
+      ],
+      "fit_predict_seconds": 2.140573263168335,
+      "n_evaluated": 2041
+    }
+  },
+  "attack": {},
+  "mcnemar": [
+    {
+      "seed": 4,
+      "a": "gist_knn",
+      "b": "cnn",
+      "a_only_correct": 65,
+      "b_only_correct": 133,
+      "p_value": 1.53348504089696e-06
+    },
+    {
+      "seed": 4,
+      "a": "gist_knn",
+      "b": "byte_hist_lr",
+      "a_only_correct": 195,
+      "b_only_correct": 124,
+      "p_value": 8.347005964154866e-05
+    },
+    {
+      "seed": 4,
+      "a": "cnn",
+      "b": "byte_hist_lr",
+      "a_only_correct": 214,
+      "b_only_correct": 75,
+      "p_value": 1.1938427455931732e-16
+    }
+  ],
+  "skipped": [],
+  "seconds": 359.6411156654358
+}
