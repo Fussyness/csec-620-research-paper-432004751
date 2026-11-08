@@ -17,6 +17,9 @@ Common conventions for every function here:
 """
 from __future__ import annotations
 import numpy as np
+from src.data import byteplot, image_bytes
+import torch
+import torch.nn.functional as F
 
 
 def append_bytes(img: np.ndarray, fraction: float, kind: str, rng: np.random.Generator,
@@ -30,7 +33,27 @@ def append_bytes(img: np.ndarray, fraction: float, kind: str, rng: np.random.Gen
                       different family (the caller picks it; take a contiguous
                       run starting at a random offset drawn from `rng`)
     """
-    raise NotImplementedError("append_bytes not implemented yet (src/attack.py)")
+    if fraction == 0:
+        return img.copy()
+
+    raw = image_bytes(img)
+    n = img.size
+    k = int(round(fraction * n))
+
+    if kind == "zero":
+        extra = bytes(k)
+    elif kind == "random":
+        extra = rng.integers(0, 256, size=k, dtype=np.uint8).tobytes()
+    elif kind == "other_family":
+        d = image_bytes(donor)
+        copies = -(-k // donor.size)
+        d = d * copies
+        start = rng.integers(0, len(d) - k + 1)
+        extra = d[start:start+k]
+    else:
+        raise ValueError(f"unknown append kind: {kind}")
+
+    return byteplot(raw+extra, width_table)
 
 
 def fgsm_append(cnn, img: np.ndarray, label: int, fraction: float, eps: float,
@@ -46,4 +69,23 @@ def fgsm_append(cnn, img: np.ndarray, label: int, fraction: float, eps: float,
     `cnn` is a src.model.CNNClassifier; `logits_from_raw` applies the same
     resize and normalisation as training, and gradients flow through it.
     """
-    raise NotImplementedError("fgsm_append not implemented yet (src/attack.py)")
+    if fraction == 0:
+        return img.copy()
+    padded = append_bytes(img, fraction, "zero", None, width_table)
+
+    n = img.size
+    k = int(round(fraction * n))
+    falseRow = np.zeros(padded.size, dtype=bool)
+    falseRow[n:n+k] = True
+    fold = falseRow.reshape(padded.shape)
+
+    x = (torch.from_numpy(padded).float() / 255)[None,None].to(cnn.device).requires_grad_(True)
+    mask = torch.from_numpy(fold)[None,None].to(cnn.device)
+
+    logits = cnn.logits_from_raw(x)
+    loss = F.cross_entropy(logits, torch.tensor([label], device=cnn.device))
+    grad = torch.autograd.grad(loss, x)[0]
+
+    adv = (x.detach() + eps * grad.sign() * mask).clamp(0, 1)
+
+    return (adv[0, 0] * 255).round().to(torch.uint8).cpu().numpy()

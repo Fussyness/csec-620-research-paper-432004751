@@ -4,7 +4,7 @@
 #   config.ci.yaml     synthetic data, tiny CNN; used by CI and the smoke tests
 #
 # Reproduction parameters are tagged "[1]" when Nataraj et al. (2011) state them,
-# or "A<n>" when [1] does not and the value is our assumption. A1-A19 are listed
+# or "A<n>" when [1] does not and the value is our assumption. A1-A23 are listed
 # with their reasons in report/main.tex (Table "Reproduction parameters").
 
 seeds: [0, 1, 2, 3, 4]
@@ -74,7 +74,9 @@ models:
 attack:
   budgets: [0, 0.01, 0.02, 0.05, 0.10]
   types: [random, zero, other_family, fgsm]
-  fgsm_eps: 1.0            # step in [0,1] pixel units; appended bytes are attacker-controlled
+  # A22: single-step FGSM step in [0,1] pixel units, appended bytes only. Chosen with
+  # scripts/fgsm_eps_pilot.py on a separate pilot model (eps 1.0 overshoots).
+  fgsm_eps: 0.05
 
 output:
   dir: results

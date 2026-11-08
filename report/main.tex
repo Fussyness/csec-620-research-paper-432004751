@@ -144,7 +144,7 @@ Used in & E1, E2, E4 & E3 \\
 \subsection{Deduplication and Splits}
 \todo{}
 \subsection{Models}
-% Reproduction parameters: what [1] states vs. what we assumed (A1-A19, the same
+% Reproduction parameters: what [1] states vs. what we assumed (A1-A23, the same
 % tags as the comments in config.yaml). In the prose, point out that [1]'s
 % protocol is under-specified (split, k, input size, sub-band split), so no
 % exact reproduction is possible: an RQ1 finding; relate it to [16].
@@ -190,6 +190,17 @@ A16 & Local contrast normalisation & same Gaussian, divide by $0.2 + \sigma_{\te
 A17 & Spatial pooling & non-overlapping $4\times4$ block means, row-major; side divisible by 4 & \todo{reason} \\
 A18 & Padding before Gabor filtering & 32\,px, symmetric, cropped after & \todo{reason} \\
 A19 & Filter response & magnitude $|\cdot|$ of the complex output & \todo{reason} \\
+% A20-A23: E4 append attacks (src/attack.py).
+A20 & Append budget unit & byteplot pixels, incl.\ zero-padded last row (A8) & \todo{reason} \\
+A21 & Donor bytes (other-family) & contiguous run at random offset; donor repeated if too short & \todo{reason} \\
+% A22 pilot (scripts/fgsm_eps_pilot.py): ResNet-18, 3 epochs, 128 px, trained on a
+% random 3,000-image Malimg subset (seed 0), 100 other images attacked at a 5% budget.
+% Fraction of images whose loss rose vs. zero-append: eps 0.01 98%, 0.05 95%, 0.2 80%,
+% 0.5 32%, 1.0 58%. Accuracy after FGSM: 0.53, 0.35, 0.59, 0.91, 0.90 (zero-append 0.73).
+% The pilot model is separate from the evaluation models, but its images come from the
+% same dataset: say so.
+A22 & FGSM & single step, untargeted, cross-entropy, $\epsilon = 0.05$, from zero bytes; appended bytes only & \todo{reason; pilot} \\
+A23 & Attacker knowledge & white-box, gradient through the CNN's resize and normalisation & \todo{reason} \\
 \bottomrule
 \end{tabular}}
 \end{table}
