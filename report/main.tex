@@ -334,13 +334,21 @@ log-transformed, whitened and contrast-normalized, padded, and filtered in the
 frequency domain; the magnitude of each response is averaged over the grid. The
 descriptor feeds a 3-nearest-neighbour classifier with Euclidean distance and no
 feature scaling. Nataraj et al.\ leave several choices unstated: the split, $k$, the
-input size and how the 20 sub-bands divide among the four scales. They also refer
-the reader elsewhere for GIST's internal constants. Table~\ref{tab:assumptions}
+input size and how the 20 sub-bands divide among the four scales, and they refer to
+Oliva and Torralba~\cite{oliva2001gist} for GIST's internal constants. Table~\ref{tab:assumptions}
 separates what~\cite{nataraj2011images} states from what we assumed. An exact
 reproduction is therefore impossible, which is itself a finding in the sense
 of~\cite{arp2022dos}.
-% Check before submitting: [1] defers GIST details to its own ref. [12]; confirm that
-% this is Oliva & Torralba [3] (refs.bib: oliva2001gist).
+% Confirmed: [1]'s ref. [12] is Oliva & Torralba (refs.bib: oliva2001gist).
+% Width table in [1] (checked): <10 kB 32; 10-30 kB 64; 30-60 kB 128; 60-100 kB 256;
+%   100-200 kB 384; 200-500 kB 512; 500-1000 kB 768; >1000 kB 1024. Adjacent ranges
+%   share their endpoints, so a file of exactly 10, 30, ... kB is ambiguous; "<10 kB"
+%   implies the lower bound is inclusive (A6), while ">1000 kB" would put exactly
+%   1000 kB in the 768 row. No BIG 2015 file in our subset lies exactly on a bound, so
+%   A6 does not affect any result. "kB" is not defined (A5): reading it as 1,000 bytes
+%   instead of 1,024 would render 48 of the 2,041 BIG 2015 files (2.4 %) one width
+%   larger (28: 256->384, 11: 384->512, 7: 512->768, 1: 128->256, 1: 768->1024).
+%   Malimg is pre-rendered, so A5 and A6 affect E3 only.
 
 \textbf{ResNet-50.} An ImageNet-pretrained ResNet-50~\cite{he2016resnet} with a new
 final layer is fine-tuned end to end. Byteplots are resized to $224 \times 224$ with
@@ -382,8 +390,8 @@ A1 & Folds & stratified 10-fold, 5 seeds & not stated; standard $k$-fold protoco
 A2 & GIST input size & $64\times64$ & not stated; keeps GIST cheap (not varied) \\
 A3 & $k$ & 3 & not stated; small odd $k$ avoids two-way ties \\
 A4 & Orientations per scale & 8, 4, 4, 4 (fine$\rightarrow$coarse) & total of 20 stated; keeps the stated 8 at the finest scale \\
-A5 & Kilobyte & 1,024 bytes & not stated; binary convention \\
-A6 & Width-table bounds & lower bound inclusive & \todo{check wording of [1]'s table} \\
+A5 & Kilobyte & 1,024 bytes & [1] writes ``kB'' without defining it; 1,000 B would widen 2.4\% of BIG 2015 images \\
+A6 & Width-table bounds & lower bound inclusive & ranges share endpoints; matches ``$<$10\,kB'' (no file lies on a bound) \\
 A7 & Averaging window $w$ & block mean, $4\times4$ & window not specified \\
 A8 & Partial last row & zero-padded & not stated \\
 A9  & Filter centre frequencies & 0.3 cycles/px, $\div 1.85$ per scale & reference GIST code \cite{oliva2001gist} \\
@@ -668,7 +676,10 @@ methodological choice, forced us to use a 2,041-sample subset rather than the fu
 
 \textbf{Reproduction choices.} Several parameters of~\cite{nataraj2011images} are
 unstated, and our assumptions (Table~\ref{tab:assumptions}) may differ from the
-original. We did not vary the GIST input size, $k$ or the division of sub-bands
+original. Even the width table is open to interpretation: it writes ``kB'' without
+defining it, and reading it as 1,000 rather than 1,024 bytes would render
+% DATA: 48 of 2,041 BIG 2015 files (2.4 %) change width under kB = 1,000 bytes (E3 only)
+\fillin{2.4\%} of our BIG~2015 images one width larger (A5). We did not vary the GIST input size, $k$ or the division of sub-bands
 among scales, so we cannot rule out that another choice would close the remaining
 half-point gap.
 
