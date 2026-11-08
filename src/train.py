@@ -30,7 +30,7 @@ import yaml
 
 from . import attack, features
 from .data import (duplicate_groups, duplicate_rate_by_family, load_dataset, make_folds,
-                   nearest_neighbor_distances, pixel_sha256, save_folds)
+                   nearest_neighbor_distances, pixel_sha256, save_folds, untestable_families)
 from .evaluate import (compute_metrics, evasion_rate, mcnemar, mean_std, robustness_auc,
                        save_budget_curves, save_confusion_matrix, save_nn_distance_hist)
 from .model import build
@@ -207,7 +207,11 @@ def prepare_experiment(exp, spec, cfg, out, skipped):
         groups = duplicate_groups(hashes, dfeat, dd["near_threshold"])
         info.update(near_threshold=dd["near_threshold"], dedup_feature=dd["feature"],
                     n_groups=int(groups.max() + 1),
-                    duplicate_rate_by_family=duplicate_rate_by_family(groups, y, ds.families))
+                    duplicate_rate_by_family=duplicate_rate_by_family(groups, y, ds.families),
+                    untestable_families=[ds.families[c] for c in untestable_families(groups, y)])
+        if info["untestable_families"]:
+            print(f"  families in a single duplicate group (excluded from the 'testable' "
+                  f"metrics): {info['untestable_families']}")
     return ds, models, reps, groups, info
 
 
@@ -221,6 +225,11 @@ def run_seed(exp, seed, prepared, cfg, out, skipped, attack_exp):
     fold = make_folds(y, cfg["splits"]["n_folds"], seed, groups)
     save_folds(os.path.join(out, "splits", f"{exp}_seed{seed}.csv"), ds, fold, groups)
     do_attack = attack_exp is not None
+    # Grouped splits: families that form a single duplicate group are never in the
+    # training data when tested. "testable" metrics leave them out (all samples of
+    # the other families are kept); attack metrics use the same subset.
+    untestable = [ds.families.index(f) for f in info.get("untestable_families", [])]
+    testable = ~np.isin(y, untestable)
     record = {"exp": exp, "seed": seed, "info": info, "models": {}, "attack": {},
               "mcnemar": [], "skipped": []}
     preds = {}
@@ -249,18 +258,26 @@ def run_seed(exp, seed, prepared, cfg, out, skipped, attack_exp):
         met = compute_metrics(y[ev], prob[ev])
         met["fit_predict_seconds"] = time.time() - t0
         met["n_evaluated"] = int(len(ev))
+        msg = ""
+        if untestable:
+            evt = ev[testable[ev]]
+            met["testable"] = {k: v for k, v in compute_metrics(y[evt], prob[evt]).items()
+                               if k in METRICS}
+            met["testable"]["n_evaluated"] = int(len(evt))
+            msg = f" | testable families: acc={met['testable']['accuracy']:.4f}"
         record["models"][m.name] = met
         preds[m.name] = (ev, prob.argmax(1))
         print(f"  {exp} seed {seed} {m.name}: acc={met['accuracy']:.4f} "
-              f"macroF1={met['f1']:.4f} ({met['fit_predict_seconds']:.0f}s)")
+              f"macroF1={met['f1']:.4f}{msg} ({met['fit_predict_seconds']:.0f}s)")
         if seed == cfg["seeds"][0]:
             save_confusion_matrix(y[ev], prob[ev].argmax(1), ds.families,
                                   os.path.join(out, exp, f"cm_{m.name}.png"), f"{exp} {m.name}")
         if do_attack:
-            clean = prob.argmax(1)[ev]
-            # per budget, in cfg order: [accuracy, evasion rate]
+            eva = ev[testable[ev]]
+            clean = prob.argmax(1)[eva]
+            # per budget, in cfg order: [accuracy, evasion rate], testable families only
             record["attack"][m.name] = {
-                kind: [[float((by_b[b][ev] == y[ev]).mean()), evasion_rate(y[ev], clean, by_b[b][ev])]
+                kind: [[float((by_b[b][eva] == y[eva]).mean()), evasion_rate(y[eva], clean, by_b[b][eva])]
                        for b in cfg["attack"]["budgets"]]
                 for kind, by_b in adv_pred.items()}
     for a, b in combinations(preds, 2):
@@ -312,6 +329,9 @@ def summarize(cfg, out, config_path, extra_skipped=()):
             s["per_family_recall"] = np.mean([p["per_family_recall"] for p in per], 0).tolist()
             s["fit_predict_seconds"] = mean_std([p["fit_predict_seconds"] for p in per])
             s["per_seed"] = [{k: p[k] for k in METRICS} for p in per]
+            if all("testable" in p for p in per):
+                s["testable"] = {k: mean_std([p["testable"][k] for p in per]) for k in METRICS}
+                s["testable"]["n_evaluated"] = per[0]["testable"]["n_evaluated"]
             summary["models"][name] = s
         _write_json(os.path.join(out, exp, "summary.json"), summary)
         if exp in wanted:

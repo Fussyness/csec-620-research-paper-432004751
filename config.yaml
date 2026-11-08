@@ -39,9 +39,11 @@ splits:
 
 dedup:
   feature: gist            # gist | thumbnail — descriptor for near-duplicate distance
-  # null = exact duplicates only. Tune on a held-out sample using
-  # results/e2/nn_distance_hist.png and info.nn_distance_quantiles in e2/summary.json.
-  near_threshold: null
+  # A24: GIST distance below which two samples count as near-duplicates (null = exact
+  # duplicates only). 0.05 lies below the valley (~0.07) that separates the duplicate
+  # spike from the typical same-family distance (~0.12) in e2/nn_distance_hist.png;
+  # scripts/dedup_threshold.py reports the sensitivity to this value.
+  near_threshold: 0.05
 
 features:
   # [1]: 4 scales, 8 orientations, N = 20 sub-bands, M = 4 (4x4 grid) → 320-D.

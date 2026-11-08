@@ -144,7 +144,7 @@ Used in & E1, E2, E4 & E3 \\
 \subsection{Deduplication and Splits}
 \todo{}
 \subsection{Models}
-% Reproduction parameters: what [1] states vs. what we assumed (A1-A23, the same
+% Reproduction parameters: what [1] states vs. what we assumed (A1-A25, the same
 % tags as the comments in config.yaml). In the prose, point out that [1]'s
 % protocol is under-specified (split, k, input size, sub-band split), so no
 % exact reproduction is possible: an RQ1 finding; relate it to [16].
@@ -201,6 +201,15 @@ A21 & Donor bytes (other-family) & contiguous run at random offset; donor repeat
 % same dataset: say so.
 A22 & FGSM & single step, untargeted, cross-entropy, $\epsilon = 0.05$, from zero bytes; appended bytes only & \todo{reason; pilot} \\
 A23 & Attacker knowledge & white-box, gradient through the CNN's resize and normalisation & \todo{reason} \\
+% A24: evidence in scripts/dedup_threshold.py (results/dedup_threshold/summary.txt,
+% pairs.png) and Table~\ref{tab:dedup}. Malimg: nearest-neighbour distance histogram
+% has a duplicate spike near 0, a valley at ~0.07 and the typical same-family distance
+% at ~0.12; every nearest neighbour below 0.12 is in the same family. Pairs below ~0.08
+% look like near-copies (pairs.png); Allaple pairs at ~0.12 share a layout only.
+% State that the value was set from the distance distribution, not from accuracy, and
+% that Table~\ref{tab:dedup} shows the result is stable from 0.03 to 0.09.
+A24 & Near-duplicate threshold & GIST distance $< 0.05$, merged transitively & \todo{reason} \\
+A25 & Single-group families & excluded from E2/E3/E4 headline metrics; all-family numbers also reported & \todo{reason} \\
 \bottomrule
 \end{tabular}}
 \end{table}
@@ -225,6 +234,19 @@ A23 & Attacker knowledge & white-box, gradient through the CNN's resize and norm
 % much accuracy moves across them here.
 \todo{}
 \subsection{RQ2: Duplicates and Leakage}
+% KEY FINDING for the prose: all 800 Yuner.A images are pixel-identical (8.6% of
+% Malimg), and at the 0.05 threshold Autorun.K (merges with Yuner.A, the only
+% cross-family group) and Obfuscator.AD also collapse into single groups. A grouped
+% split never trains on these families when it tests them, so the all-family E2
+% drop mostly measures "unseen family", not leakage. The testable-family numbers
+% (dagger in Table~\ref{tab:main}) isolate the leakage effect. Pilot with GIST + 3-NN:
+% exact-only grouping gives the same accuracy as E1 once Yuner.A is excluded.
+\begin{table}[t]
+\centering
+\caption{Sensitivity to the near-duplicate threshold (A24), Malimg.}
+\label{tab:dedup}
+\resizebox{\columnwidth}{!}{\inputgen{table_dedup.tex}}
+\end{table}
 \begin{table}[t]
 \centering
 \caption{Per-family duplicate rate and recall, E1 (random) vs.\ E2 (grouped).}

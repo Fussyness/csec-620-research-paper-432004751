@@ -67,4 +67,5 @@ echo "[$(date +%T)] merging"
 $PY -m src.train --config "$CONFIG" --merge | tee "$LOGS/merge.log"
 OUT=$($PY -c "import sys; from src.train import load_config; print(load_config(sys.argv[1])['output']['dir'])" "$CONFIG")
 $PY -m src.tables --results "$OUT"
+$PY scripts/dedup_threshold.py --config "$CONFIG" --out "$OUT/dedup_threshold" | tee "$LOGS/dedup_threshold.log"
 echo "[$(date +%T)] all done"

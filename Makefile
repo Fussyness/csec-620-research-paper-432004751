@@ -30,6 +30,7 @@ setup:
 reproduce:
 	$(PY) -m src.train --config config.yaml
 	$(PY) -m src.tables --results results
+	$(PY) scripts/dedup_threshold.py --config config.yaml
 
 quick:
 	$(PY) -m src.train --config config.quick.yaml

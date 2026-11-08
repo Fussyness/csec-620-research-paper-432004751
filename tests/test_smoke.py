@@ -10,7 +10,7 @@ import pytest
 
 from src import attack, features
 from src.data import (byteplot, duplicate_groups, image_bytes, make_folds, make_synthetic,
-                      pixel_sha256, width_for_size)
+                      pixel_sha256, untestable_families, width_for_size)
 from src.evaluate import compute_metrics, mcnemar, robustness_auc
 from src.train import load_config, main
 
@@ -43,6 +43,16 @@ def test_exact_duplicates_found(syn):
     hashes = [pixel_sha256(syn.load(i)) for i in range(len(syn))]
     groups = duplicate_groups(hashes, None, None)
     assert groups.max() + 1 < len(syn)               # the generator injects duplicates
+
+
+def test_untestable_families():
+    """A family whose samples share one duplicate group can never be both trained
+    and tested under a grouped split (Malimg's Yuner.A)."""
+    labels = np.array([0, 0, 0, 1, 1, 2, 2, 2])
+    groups = np.array([5, 5, 5, 6, 7, 8, 8, 9])     # family 0: one group; 1 and 2: two each
+    assert untestable_families(groups, labels) == [0]
+    groups[3:5] = 5                                    # family 1 merges into family 0's group
+    assert untestable_families(groups, labels) == [0, 1]
 
 
 def test_no_duplicate_group_spans_two_folds(syn):

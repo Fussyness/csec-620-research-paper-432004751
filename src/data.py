@@ -258,6 +258,13 @@ def duplicate_rate_by_family(groups: np.ndarray, labels: np.ndarray, families) -
             for li, fam in enumerate(families)}
 
 
+def untestable_families(groups: np.ndarray, labels: np.ndarray) -> list[int]:
+    """Families whose samples all fall in a single duplicate group. A grouped split
+    keeps a group inside one fold, so such a family is never in the training data
+    when it is tested (e.g. Malimg's Yuner.A: 800 pixel-identical images)."""
+    return [int(c) for c in np.unique(labels) if len(np.unique(groups[labels == c])) < 2]
+
+
 # ---------------------------------------------------------------- folds
 def make_folds(labels: np.ndarray, n_folds: int, seed: int,
                groups: np.ndarray | None = None) -> np.ndarray:

@@ -22,20 +22,41 @@ def esc(s):
     return s.replace("_", r"\_").replace("&", r"\&")
 
 
+def _has_testable(exp: dict) -> bool:
+    return any("testable" in r for r in exp["models"].values())
+
+
 def main_results(exps: dict) -> str:
-    cols = [e for e in ("e1", "e2", "e3") if e in exps]
-    models = [m for m in MODEL_NAMES if any(m in exps[e]["models"] for e in cols)]
-    head = " & ".join(f"\\multicolumn{{2}}{{c}}{{{e.upper()}}}" for e in cols)
+    """E1-E3 accuracy and macro-F1. For grouped experiments with families that form a
+    single duplicate group, the main column covers the testable families only (marked
+    with a dagger) and an extra "all families" column follows."""
+    base = [e for e in ("e1", "e2", "e3") if e in exps]
+    cols = []                                   # (exp, use_testable, header)
+    for e in base:
+        if _has_testable(exps[e]):
+            cols += [(e, True, e.upper() + r"$^\dagger$"), (e, False, e.upper() + " (all fam.)")]
+        else:
+            cols.append((e, False, e.upper()))
+    models = [m for m in MODEL_NAMES if any(m in exps[e]["models"] for e in base)]
+    head = " & ".join(f"\\multicolumn{{2}}{{c}}{{{h}}}" for _, _, h in cols)
     lines = [r"\begin{tabular}{l" + "cc" * len(cols) + "}", r"\toprule",
              f"Model & {head} \\\\",
              " & " + " & ".join(["Acc. (\\%)", "Macro-F1 (\\%)"] * len(cols)) + r" \\", r"\midrule"]
     for m in models:
         cells = []
-        for e in cols:
+        for e, use_t, _ in cols:
             r = exps[e]["models"].get(m)
+            if r and use_t:
+                r = r.get("testable")
             cells += [pm(r["accuracy"]), pm(r["f1"])] if r else ["--", "--"]
         lines.append(f"{MODEL_NAMES[m]} & " + " & ".join(cells) + r" \\")
-    lines += [r"\bottomrule", r"\end{tabular}"]
+    lines.append(r"\bottomrule")
+    notes = sorted({f for e in base for f in exps[e]["info"].get("untestable_families", [])})
+    if notes:
+        lines.append(f"\\multicolumn{{{1 + 2 * len(cols)}}}{{l}}{{\\footnotesize $^\\dagger$Excluded "
+                     f"(single duplicate group, never in training when tested): "
+                     + ", ".join(esc(f) for f in notes) + r".} \\")
+    lines.append(r"\end{tabular}")
     return "\n".join(lines)
 
 
@@ -45,12 +66,18 @@ def per_family(exps: dict, model: str) -> str:
     dup = e2["info"].get("duplicate_rate_by_family", {})
     r1 = e1["models"][model]["per_family_recall"]
     r2 = e2["models"][model]["per_family_recall"]
+    untestable = set(e2["info"].get("untestable_families", []))
     lines = [r"\begin{tabular}{lrrrr}", r"\toprule",
              r"Family & $n$ & Dup. (\%) & Recall E1 & Recall E2 \\", r"\midrule"]
     for i, fam in enumerate(fams):
-        lines.append(f"{esc(fam)} & {e1['info']['family_counts'][i]} & {100 * dup.get(fam, 0):.1f} & "
+        mark = r"$^\ddagger$" if fam in untestable else ""
+        lines.append(f"{esc(fam)}{mark} & {e1['info']['family_counts'][i]} & {100 * dup.get(fam, 0):.1f} & "
                      f"{100 * r1[i]:.1f} & {100 * r2[i]:.1f} \\\\")
-    lines += [r"\bottomrule", r"\end{tabular}"]
+    lines.append(r"\bottomrule")
+    if untestable:
+        lines.append(r"\multicolumn{5}{l}{\footnotesize $^\ddagger$One duplicate group: "
+                     r"never in training when tested (E2).} \\")
+    lines.append(r"\end{tabular}")
     return "\n".join(lines)
 
 
@@ -66,7 +93,9 @@ def robustness(e4: dict) -> str:
 
 
 def macros(metrics: dict) -> str:
-    """\\newcommand per headline number, e.g. \\EOneGistknnAcc, for use in prose."""
+    """\\newcommand per headline number, e.g. \\EOneGistKnnAcc, for use in prose.
+    Where testable-family metrics exist (grouped splits), the plain macro is the
+    testable value and the ...All macro (e.g. \\ETwoGistKnnAccAll) covers all families."""
     out = []
     for e, s in metrics["experiments"].items():
         for m, r in s.get("models", {}).items():
@@ -74,8 +103,10 @@ def macros(metrics: dict) -> str:
                 continue
             name = e.upper().replace("1", "One").replace("2", "Two").replace("3", "Three") + \
                 m.replace("_", " ").title().replace(" ", "")
-            for k, short in (("accuracy", "Acc"), ("f1", "Fone")):
-                out.append(f"\\newcommand{{\\{name}{short}}}{{{100 * r[k]['mean']:.2f}\\%}}")
+            variants = [("", r.get("testable", r))] + ([("All", r)] if "testable" in r else [])
+            for suffix, src in variants:
+                for k, short in (("accuracy", "Acc"), ("f1", "Fone")):
+                    out.append(f"\\newcommand{{\\{name}{short}{suffix}}}{{{100 * src[k]['mean']:.2f}\\%}}")
     return "\n".join(out)
 
 
