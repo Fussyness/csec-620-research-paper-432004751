@@ -39,7 +39,8 @@ reproduce:
 	$(PY) -m src.tables --results results
 
 # Recompute every number from the datasets, ignoring existing results.
-# About 14 h on one GPU; see scripts/lovegood/ for the 10-GPU parallel version.
+# Measured: 12.9 GPU-hours (about 13 h on one Tesla T4); 2 h 12 min on 10 T4s with
+# the parallel version in scripts/lovegood/.
 reproduce-scratch:
 	$(PY) -m src.train --config config.yaml --fresh
 	$(PY) scripts/dedup_threshold.py --config config.yaml --fresh

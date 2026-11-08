@@ -7,6 +7,12 @@
 
 Replace `USER` below with your RIT username.
 
+**Measured (final run, 8 Nov 2026, `config.yaml`, all 10 GPUs):** 2 h 12 min wall-clock
+(14:25:14 to 16:37:20), including the cache build and the merge. 15 jobs, 12.9
+GPU-hours in total; mean per job E1 27.5 min, E2 + E4 attacks 121 min (longest 2.05 h),
+E3 6 min. When the Malimg caches already exist, the cache stage only renders BIG 2015
+(about 5-10 min).
+
 ## 1. One-time setup
 
 On the server:

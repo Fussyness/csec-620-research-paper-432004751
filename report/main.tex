@@ -219,6 +219,14 @@ A25 & Single-group families & excluded from E2/E3/E4 headline metrics; all-famil
 \subsection{Threat Model and Attacks}
 \todo{}
 \subsection{Metrics and Statistics}
+% Experimental setup (state it, with the hardware): all reported numbers come from
+% config.yaml, 5 seeds x 10 folds, run on lovegood.cs.rit.edu with 10 NVIDIA Tesla
+% T4 GPUs (16 GB each; 48 CPU cores), one (experiment, seed) job per GPU: 15 jobs.
+% Wall-clock 2 h 12 min (8 Nov 2026); 12.9 GPU-hours in total (about 13 h on one T4).
+% Mean per job: E1 27.5 min, E2 + E4 attacks 121 min, E3 6 min. ResNet-50 fine-tuning
+% and FGSM ran on the GPU; GIST, k-NN, the byte histogram and the black-box attacks
+% on the CPU. Source: results/<exp>/runs/seed*.json ("seconds"), metrics.json
+% ("compute_seconds"), and the run log.
 \todo{}
 
 % ---------------------------------------------------------------- V (2.0 p)
@@ -287,6 +295,9 @@ A25 & Single-group families & excluded from E2/E3/E4 headline metrics; all-famil
 \section{Limitations and Threats to Validity}
 % No timestamps (no temporal split) [15]; Malimg ships images not binaries, so
 % functionality of perturbed files cannot be verified; small family count; compute.
+% Compute: a from-scratch run needs 12.9 GPU-hours (2 h 12 min on 10 T4s), so the
+% repository's quick check re-merges committed per-seed results instead of
+% recomputing them (appendix "Code and Reproducibility").
 % MUST INCLUDE:
 %  - Unverified mirror: we cannot confirm the Malimg mirror is identical to the
 %    authors' original data (count already differs: 9,339 vs 9,458).
@@ -307,6 +318,14 @@ A25 & Single-group families & excluded from E2/E3/E4 headline metrics; all-famil
 \appendices
 \section{Code and Reproducibility}
 % Repo URL + tag; `make reproduce` (config.yaml) vs `make quick`; which produced the numbers.
+% - All numbers: config.yaml (5 seeds x 10 folds), lovegood.cs.rit.edu, 10 x Tesla T4,
+%   2 h 12 min wall-clock (8 Nov 2026), 12.9 GPU-hours; commit 9e6d66a.
+% - `make reproduce` (no datasets needed, ~13 s): reuses the committed per-seed results
+%   (each stamped with its config fingerprint and commit) and regenerates
+%   results/metrics.json and every table in report/generated/.
+% - `make reproduce-scratch`: recomputes everything from the datasets (about 13 h on
+%   one T4); scripts/lovegood/run_parallel.sh is the 10-GPU version.
+% - Datasets: manual download (data/README.md); not redistributable.
 \todo{}
 \section{AI Use and Statement of Original Work}
 % Required by the assignment. Log every substantive AI use (see SUBMISSION.md).

@@ -27,13 +27,13 @@ make test
 
 The full experiment cannot be recomputed inside a short grading window: both datasets
 need a manual download behind a Kaggle login and cannot be committed (data/README.md),
-and the full run (5 seeds x 10 folds, ResNet-50, E1-E4) takes about 2.5 h on 10 Tesla T4
-GPUs (about 14 h on one). The repository therefore separates two levels:
+and the full run (5 seeds x 10 folds, ResNet-50, E1-E4) took 2 h 12 min on 10 Tesla T4
+GPUs: 12.9 GPU-hours, so about 13 h on one. The repository therefore separates two levels:
 
 | Command | Needs data | Time | What it shows |
 |---|---|---|---|
 | `make reproduce` | no | seconds | every number in the paper is computed from the committed raw results |
-| `make reproduce-scratch` | yes | hours | the raw results themselves can be recreated |
+| `make reproduce-scratch` | yes | ~13 h on one T4 (2 h 12 min on 10) | the raw results themselves can be recreated |
 
 - **Committed raw results.** `results/<exp>/runs/seed<s>.json` holds each seed's
   out-of-fold metrics, per-family recall, attack results and McNemar counts, written by
@@ -103,16 +103,16 @@ looks clean.
 
 ## Requirements checklist (per the project handout)
 
-- [ ] `make reproduce` runs clean from a fresh environment (uses committed results)
-- [ ] Results (`results/`) match what your report claims
-- [ ] Evaluation reports precision / recall / F1 / ROC-AUC, not just accuracy
-- [ ] No data leakage (scaling/fitting on train only)
+- [X] `make reproduce` runs clean from a fresh environment (uses committed results)
+- [X] Results (`results/`) match what your report claims
+- [X] Evaluation reports precision / recall / F1 / ROC-AUC, not just accuracy
+- [X] No data leakage (scaling/fitting on train only)
 - [ ] Report in IEEE format (`report/`), code referenced in the appendix
 - [ ] Author listed below
 
 ## Author
 
-- Name (RIT ID)
+- Theodore DellaVilla (432004751)
 
 ## Academic integrity & AI use
 
