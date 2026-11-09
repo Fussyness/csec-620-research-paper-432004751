@@ -32,3 +32,6 @@ grading/auto_report.json
 .DS_Store
 .vscode/
 .idea/
+
+# Overleaf exports
+*.zip

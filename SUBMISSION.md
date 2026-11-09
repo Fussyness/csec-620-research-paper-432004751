@@ -75,4 +75,4 @@ per-family table, the threshold sensitivity table) is generated from `results/` 
   author.
 - Paper (Nov 2026): Claude drafted the body text of `report/main.tex` from the
   author's results, leaving the result values as marked gaps for the author to fill
-  in and check. [Author: describe your own edits here.]
+  in and check. The author made sure the data extracted from the test run and the data taken from accompanying papers were correctly placed before finalizing the full draft.
