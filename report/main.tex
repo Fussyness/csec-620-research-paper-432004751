@@ -143,8 +143,7 @@ changes the byteplot: the image grows taller and may move into a wider row of th
 width table.
 
 % ---------------------------------------------------------------- III (1.3 p)
-% Checked against the papers: [3]-[9], [11]-[13], [15]-[18]. Still unverified from
-% the paper itself: [14] Brosolo SoK.
+% Every cited paper's summary has been checked against the paper itself.
 \section{Related Work}
 \textbf{Image construction.} Nataraj et al.~\cite{nataraj2011images} introduced
 byteplots and Malimg. A companion study by the same group~\cite{nataraj2011comparative}
@@ -156,7 +155,11 @@ images from SimHash encodings of disassembled opcode sequences rather than raw b
 (MCSC, 98.86\% on BIG~2015, against about 96\% for their GIST + $k$-NN baseline), and Vasan
 et al.~\cite{vasan2020imcfn} used color instead of grayscale images. A recent
 systematization of knowledge~\cite{brosolo2024sok} organizes visualization-based
-detection by pipeline stage; we follow its structure here.
+detection by pipeline stage (datasets, image generation, feature extraction,
+classification and evaluation); we follow its structure here. It also observes that
+GIST, as a global descriptor, could be evaded by an adversary who rearranges sections
+of the code, and that the lack of uniform classifiers hinders objective comparison
+between methods.
 
 \textbf{Features and classifiers.} After GIST, most work replaced hand-designed
 descriptors with CNNs. Kalash et al.~\cite{kalash2018mcnn} fine-tuned a VGG16-based
@@ -275,7 +278,8 @@ so we used a public mirror:
 Kaggle dataset ``ikrambenabd/malimg-original'', version 1, downloaded on 2 Nov 2026\footnote{\url{https://www.kaggle.com/datasets/ikrambenabd/malimg-original}; archive SHA-256 0457c29a1b792704\ldots}.
 It contains 9,339 grayscale PNG images in 25 families, 119 fewer than the 9,458
 reported in~\cite{nataraj2011images}; recent work~\cite{tariq2026framework} uses the
-same 9,339 images. Malimg ships as pre-rendered byteplots, so the width table was not
+same 9,339 images, and a recent survey~\cite{brosolo2024sok} gives 9,339 as the size of
+Malimg. Malimg ships as pre-rendered byteplots, so the width table was not
 applied by us and the original binaries are not available. Family sizes range from 80
 (Skintrim.N) to 2,949 (Allaple.A).
 
