@@ -77,7 +77,7 @@ lay the bytes out as a grayscale image (a \emph{byteplot}), describe the image's
 texture with the GIST descriptor~\cite{oliva2001gist}, and classify it with $k$-nearest
 neighbours. On a new dataset of 25 families, Malimg, they reported about 98\%
 accuracy. Over the following decade, convolutional neural networks (CNNs) pushed the
-same benchmark to 98--99\%~\cite{kalash2018mcnn,gibert2019cnn,vasan2020imcfn,vasan2020imcec}.
+same benchmark to 98--99.5\%~\cite{kalash2018mcnn,gibert2019cnn,vasan2020imcfn,vasan2020imcec}.
 
 Such uniformly high numbers raise a question that the literature rarely asks: are
 they a property of the methods, or of the benchmark and how it is evaluated? Work on
@@ -135,16 +135,17 @@ ImageNet can be fine-tuned on a small dataset by replacing the final layer. Appl
 byteplots, the network learns texture features directly instead of using a
 hand-designed descriptor.
 
-\textbf{Appending to a PE file.} Bytes appended after the last section of a PE file
-(the \emph{overlay}) are not mapped into memory by the loader, so they do not change
-the program's behaviour~\cite{demetrio2021exemples}. Appending is therefore the
-simplest functionality-preserving manipulation available to an attacker, and it
+\textbf{Appending to a PE file.} Appending bytes to the end of a PE file is a
+functionality-preserving manipulation: the appended content is never executed, so the
+program's behaviour is unchanged~\cite{kolosnjaji2018adversarial,demetrio2021exemples}.
+Appending is therefore the simplest evasion an attacker can apply, and it
 changes the byteplot: the image grows taller and may move into a wider row of the
 width table.
 
 % ---------------------------------------------------------------- III (1.3 p)
-% VERIFY: each sentence below summarizes a cited paper at the level of its abstract.
-% Check them against the papers (especially [2], [5], [6], [13], [14]) before submitting.
+% Checked against the papers: [3]-[9], [11], [15]-[17]. Still unverified from the
+% papers themselves: [12] Nataraj comparative (IMCEC's summary supports "comparable
+% accuracy"; "fraction of the cost" is unconfirmed), [13] Ni et al., [14] Brosolo SoK.
 \section{Related Work}
 \textbf{Image construction.} Nataraj et al.~\cite{nataraj2011images} introduced
 byteplots and Malimg. A companion study~\cite{nataraj2011comparative} compared binary
@@ -161,25 +162,35 @@ network (M-CNN) and reported 98.52\% on Malimg and 98.99\% on BIG~2015.
 Gibert et al.~\cite{gibert2019cnn} trained a CNN from scratch on both datasets (98.48\% on Malimg,
 97.5\% on BIG~2015, 10-fold CV).
 Vasan et al.\ fine-tuned CNNs on color byteplots (IMCFN, 98.82\% on
-Malimg)~\cite{vasan2020imcfn} and combined several architectures in an ensemble
-(IMCEC)~\cite{vasan2020imcec}. MalConv~\cite{raff2018malconv} skips the image
-altogether and applies a CNN to the raw byte sequence. Table~\ref{tab:published}
+Malimg)~\cite{vasan2020imcfn} and combined fine-tuned VGG16 and ResNet-50 models with
+SVMs in an ensemble (IMCEC, 99.50\%)~\cite{vasan2020imcec}; both papers note that the
+two Swizzor variants are the families most often confused. MalConv~\cite{raff2018malconv}
+skips the image altogether and applies a CNN to the raw byte sequence; its authors argue
+that byteplots impose a false spatial prior, since a 2-D convolution over a byteplot
+amounts to a dilated 1-D convolution whose gaps are set by the arbitrary image width.
+Table~\ref{tab:published}
 lists these results with the details that decide whether they are comparable to ours.
 
-\textbf{Evaluation practice.} TESSERACT~\cite{pendlebury2019tesseract} showed that
-spatial and temporal bias in how data are split can inflate malware classifiers'
-reported performance far above what they achieve in deployment. Arp et
-al.~\cite{arp2022dos} catalogued common pitfalls in security machine learning,
-including sampling bias, data snooping, inappropriate baselines and lab-only
-evaluation. Neither study examines Malimg's duplicate structure, which is the focus of
-our RQ2.
+\textbf{Evaluation practice.} TESSERACT~\cite{pendlebury2019tesseract} showed, for
+Android malware, that spatial and temporal bias in how data are split can inflate
+reported F1 scores by up to 50\%; it notes that $k$-fold cross-validation almost always
+places a variant of each family in the training set, so closely related samples make
+testing easier. Arp et al.~\cite{arp2022dos} catalogued ten pitfalls of machine
+learning in security, including sampling bias, data snooping, inappropriate baselines
+(they recommend always comparing against simple models), lab-only evaluation and
+inappropriate threat models. Neither study examines Malimg's duplicate structure,
+which is the focus of our RQ2.
 
 \textbf{Robustness.} Kolosnjaji et al.~\cite{kolosnjaji2018adversarial} showed that
-appending a few gradient-chosen bytes evades MalConv, and Demetrio et
-al.~\cite{demetrio2021exemples} surveyed practical functionality-preserving attacks on
-Windows malware detectors, from appending to header and section manipulation.
-AMGmal~\cite{zhan2023amgmal} uses adaptive masks to minimize the perturbation needed
-to evade a detector. Tariq et al.~\cite{tariq2026framework}, using the same
+appending 10,000 gradient-optimized padding bytes, under 1\% of the input, evades
+MalConv in about 60\% of cases, whereas random padding bytes evade it far less often.
+Demetrio et al.~\cite{demetrio2021exemples} surveyed practical functionality-preserving
+attacks on Windows malware detectors, from padding to header and section
+manipulation, and observed that padding is the easiest to strip before classification.
+AMGmal~\cite{zhan2023amgmal} attacks image-based (byteplot) CNN detectors on Malimg,
+modifying slack bytes inside the file chosen by a saliency map; it evades them in 68\%
+of cases while changing 0.9\% of bytes, and reports up to 69\% evasion for iterative
+gradient appending at a 4\% budget. Tariq et al.~\cite{tariq2026framework}, using the same
 9,339-image version of Malimg as we do, balance the families with SVM-SMOTE, generate
 FGSM perturbations restricted by a PE-structure mask to slack and writable regions,
 and retrain on the adversarial samples. They report an 81\% evasion rate while
@@ -715,7 +726,10 @@ half-point gap.
 \textbf{Threat model.} Malimg provides images, not binaries, so we treat image pixels
 as file bytes and cannot verify that a perturbed file still runs. Our FGSM is a single
 step chosen on a pilot model that shares the evaluation dataset; it is a lower bound
-on what a white-box attacker can do.
+on what a white-box attacker can do, as iterative gradient attacks have reached about
+60--69\% evasion with budgets of 1--4\%~\cite{kolosnjaji2018adversarial,zhan2023amgmal}.
+Conversely, appended bytes are also the easiest perturbation for a defender to strip
+before classification~\cite{demetrio2021exemples}.
 
 \textbf{Temporal and family coverage.} Neither dataset has timestamps, so we cannot
 test the temporal bias that TESSERACT~\cite{pendlebury2019tesseract} identifies, and
