@@ -272,11 +272,11 @@ per family with seed 620, keeping all 42 Simda samples (2,042 samples; the list 
 committed to the repository). One Ramnit sample consists only of \texttt{??} bytes and
 is excluded, leaving 2,041. Table~\ref{tab:datasets} summarizes both datasets.
 
-\begin{table}[t]
+\begin{table*}[t]
 \centering
 \caption{Datasets as used in this work.}
 \label{tab:datasets}
-\resizebox{\columnwidth}{!}{%
+\small
 \begin{tabular}{lll}
 \toprule
  & Malimg \cite{nataraj2011images} & BIG 2015 \cite{ronen2018big2015} \\
@@ -290,8 +290,8 @@ Rendering & none (as shipped) & width table of \cite{nataraj2011images}; \texttt
 Sampling & all & $\le$250 per family (seed 620); all 42 Simda \\
 Used in & E1, E2, E4 & E3 \\
 \bottomrule
-\end{tabular}}
-\end{table}
+\end{tabular}
+\end{table*}
 
 \subsection{Deduplication and Splits}
 \textbf{Exact duplicates.} We hash each image's pixels with SHA-256.

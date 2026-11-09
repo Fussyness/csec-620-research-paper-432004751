@@ -72,21 +72,40 @@ def save_confusion_matrix(y_true, y_pred, families, path, title):
     fig.tight_layout(); fig.savefig(path, dpi=200); plt.close(fig)
 
 
+# Fixed name, colour and marker per model, so every panel uses the same key.
+_MODEL_STYLE = {"gist_knn": ("GIST + k-NN", "tab:blue", "o"),
+                "cnn": ("ResNet-50 (fine-tuned)", "tab:orange", "s"),
+                "byte_hist_lr": ("Byte histogram + LR", "tab:green", "^")}
+_ATTACK_TITLE = {"random": "Random bytes", "zero": "Zero padding",
+                 "other_family": "Other-family bytes", "fgsm": "FGSM (white-box, CNN only)"}
+
+
 def save_budget_curves(e4: dict, budgets, path):
-    """e4[model][attack]["accuracy"] = list of {mean, std} per budget."""
-    attacks = sorted({a for m in e4.values() for a in m})
-    fig, axes = plt.subplots(1, len(attacks), figsize=(2.6 * len(attacks), 2.6),
+    """e4[model][attack]["accuracy"] = list of {mean, std} per budget. One panel per
+    attack, a fixed style per model and one shared legend for all panels."""
+    order = ["random", "zero", "other_family", "fgsm"]
+    present = {a for m in e4.values() for a in m}
+    attacks = [a for a in order if a in present] + sorted(present - set(order))
+    fig, axes = plt.subplots(1, len(attacks), figsize=(2.6 * len(attacks), 2.9),
                              sharey=True, squeeze=False)
     x = 100 * np.asarray(budgets)
+    handles = {}
     for ax, atk in zip(axes[0], attacks):
         for model, per_attack in e4.items():
-            if atk in per_attack:
-                acc = per_attack[atk]["accuracy"]
-                ax.errorbar(x, [a["mean"] for a in acc], yerr=[a["std"] for a in acc],
-                            marker="o", ms=3, capsize=2, label=model)
-        ax.set_title(atk, fontsize=8); ax.set_xlabel("Appended bytes (%)")
-    axes[0][0].set_ylabel("Accuracy"); axes[0][0].legend(fontsize=7)
-    fig.tight_layout(); fig.savefig(path, dpi=200); plt.close(fig)
+            if atk not in per_attack:
+                continue
+            name, color, marker = _MODEL_STYLE.get(model, (model, None, "o"))
+            acc = per_attack[atk]["accuracy"]
+            h = ax.errorbar(x, [a["mean"] for a in acc], yerr=[a["std"] for a in acc],
+                            color=color, marker=marker, ms=3, capsize=2, label=name)
+            handles.setdefault(name, h)
+        ax.set_title(_ATTACK_TITLE.get(atk, atk), fontsize=8)
+        ax.set_xlabel("Appended bytes (%)", fontsize=8)
+        ax.tick_params(labelsize=7); ax.grid(alpha=0.3)
+    axes[0][0].set_ylabel("Accuracy (testable families)", fontsize=8)
+    fig.legend(handles.values(), handles.keys(), loc="upper center",
+               ncol=len(handles), fontsize=8, frameon=False)
+    fig.tight_layout(rect=(0, 0, 1, 0.9)); fig.savefig(path, dpi=200); plt.close(fig)
 
 
 def save_nn_distance_hist(dists, threshold, path, feature):
