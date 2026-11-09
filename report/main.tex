@@ -188,10 +188,13 @@ MalConv in about 60\% of cases, whereas random padding bytes evade it far less o
 Demetrio et al.~\cite{demetrio2021exemples} surveyed practical functionality-preserving
 attacks on Windows malware detectors, from padding to header and section
 manipulation, and observed that padding is the easiest to strip before classification.
-AMGmal~\cite{zhan2023amgmal} attacks image-based (byteplot) CNN detectors on Malimg,
-modifying slack bytes inside the file chosen by a saliency map; it evades them in 68\%
-of cases while changing 0.9\% of bytes, and reports up to 69\% evasion for iterative
-gradient appending at a 4\% budget. Tariq et al.~\cite{tariq2026framework}, using the same
+AMGmal~\cite{zhan2023amgmal} attacks byteplot CNN detectors trained to separate Malimg
+malware from benign files, modifying slack bytes inside the file chosen by a saliency
+map; it evades them in 68\% of cases while changing 0.9\% of bytes, and reports up to
+69\% evasion for iterative gradient appending at a 4\% budget. Its authors note that
+appending, unlike their attack, changes the file size and may alert a defender. Because
+those detectors make a malware-versus-benign decision, their evasion rates are not
+directly comparable to the family-level evasion we measure. Tariq et al.~\cite{tariq2026framework}, using the same
 9,339-image version of Malimg as we do, balance the families with SVM-SMOTE, generate
 FGSM perturbations restricted by a PE-structure mask to slack and writable regions,
 and retrain on the adversarial samples. They report an 81\% evasion rate while
