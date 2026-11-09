@@ -7,7 +7,9 @@
     3,
     4
   ],
-  "compute_seconds": 46345.9,
+  "run_info": {
+    "compute_seconds": 46345.9
+  },
   "headline_source": "e1/gist_knn (mean over seeds)",
   "accuracy": 0.9746011350251633,
   "precision": 0.9366801777307245,

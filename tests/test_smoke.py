@@ -123,6 +123,8 @@ def test_end_to_end_ci_config(tmp_path):
     m = json.loads((tmp_path / "out" / "metrics.json").read_text())
     for k in ("accuracy", "precision", "recall", "f1", "roc_auc"):
         assert 0.0 <= m[k] <= 1.0
+    # grading/grade.py fails metrics.json if any top-level number lies outside [0, 1]
+    assert all(0 <= v <= 1 for v in m.values() if isinstance(v, (int, float)))
     assert "e1" in m["experiments"] and "e2" in m["experiments"]
     assert (tmp_path / "out" / "splits" / "e2_seed0.csv").exists()
 

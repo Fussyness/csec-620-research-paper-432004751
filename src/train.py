@@ -385,8 +385,10 @@ def summarize(cfg, out, config_path, extra_skipped=()):
                                os.path.join(out, attack_exp, "budget_curves.png"))
             summaries[attack_exp] = asum
 
+    # Top-level numbers are metrics in [0, 1] (grading/grade.py checks this), so run
+    # information is nested.
     metrics = {"config": config_path, "seeds": cfg["seeds"],
-               "compute_seconds": round(seconds, 1)}
+               "run_info": {"compute_seconds": round(seconds, 1)}}
     for exp, model in (h.split("/") for h in cfg["run"]["headline"]):
         res = summaries.get(exp, {}).get("models", {}).get(model)
         if res and "accuracy" in res:
